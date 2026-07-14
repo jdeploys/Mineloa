@@ -5,6 +5,7 @@ import type { MeetingRepository } from '../db/meetingRepository'
 import type { TemplateRepository } from '../db/templateRepository'
 import type { SummaryTemplate } from '../../shared/contracts/template'
 import { DEFAULT_TEMPLATE_ID } from '../templates/defaultTemplate'
+import { parseArchive } from './archiveSchema'
 
 type ExportRepository = Pick<MeetingRepository, 'requireById' | 'listSpeakers' | 'listTranscript' | 'listSummarySections' | 'listActionItems'>
 type TemplateLookup = Pick<TemplateRepository, 'findById'>
@@ -48,7 +49,7 @@ export async function exportMeetingArchive(
   })
   const payloadNames = ['meeting.json', 'transcript.json', 'summary.json', ...(audio === null ? [] : ['audio.webm'])]
   const manifest = { format: 'nnote', version: 1, entries: payloadNames }
-  const entries: Record<string, Uint8Array | [Uint8Array, { level: 0 }]> = {
+  const entries: Record<string, Uint8Array> = {
     'manifest.json': strToU8(JSON.stringify(manifest)),
     'meeting.json': strToU8(JSON.stringify({
       title: meeting.title, createdAt: meeting.createdAt, updatedAt: meeting.updatedAt,
@@ -64,6 +65,8 @@ export async function exportMeetingArchive(
       actionItems: repository.listActionItems(meetingId).map(({ id, content, assigneeSpeakerId, dueAt, completed }) => ({ id, content, assigneeSpeakerId, dueAt, completed })),
     })),
   }
-  if (audio !== null) entries['audio.webm'] = [audio, { level: 0 }]
-  return { bytes: zipSync(entries), includedAudio: audio !== null, audioCoverage: audio === null ? 'none' : 'primary-part-only' }
+  if (audio !== null) entries['audio.webm'] = audio
+  const bytes = zipSync(entries, { level: 0 })
+  parseArchive(bytes)
+  return { bytes, includedAudio: audio !== null, audioCoverage: audio === null ? 'none' : 'primary-part-only' }
 }

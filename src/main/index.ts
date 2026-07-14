@@ -22,6 +22,7 @@ import { startSingleInstanceApp } from './app/singleInstance'
 import { registerMediaProtocol } from './media/registerMediaProtocol'
 import { registerMeetingHandlers } from './ipc/registerMeetingHandlers'
 import { registerArchiveHandlers } from './ipc/registerArchiveHandlers'
+import { reconcileImportJournals } from './archive/importMeeting'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'nnote-media',
@@ -32,11 +33,18 @@ startSingleInstanceApp(app, BrowserWindow, () => {
   const credentialStore = new KeyringCredentialStore()
   registerSettingsHandlers(ipcMain, credentialStore, new OpenAiKeyValidator())
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     const userDataDirectory = app.getPath('userData')
     const database = openDatabase(join(userDataDirectory, 'nnote.sqlite'))
     const meetings = new MeetingRepository(database)
     const recordingsDirectory = join(userDataDirectory, 'recordings')
+    try {
+      await reconcileImportJournals(database, recordingsDirectory)
+    } catch {
+      dialog.showErrorBox('Nnote 가져오기 복구 필요', '완료되지 않은 가져오기 기록을 안전하게 복구하지 못했습니다. 파일은 보존되었습니다.')
+      database.close()
+      return
+    }
     const recordingService = new RecordingService(meetings, recordingsDirectory)
     const templateRepository = new TemplateRepository(database)
     const templateService = new TemplateService(templateRepository)

@@ -1,4 +1,4 @@
-import { open, readFile, rename, rm, stat } from 'node:fs/promises'
+import { open, rename, rm } from 'node:fs/promises'
 import type Database from 'better-sqlite3'
 import type { MeetingRepository } from '../db/meetingRepository'
 import type { TemplateRepository } from '../db/templateRepository'
@@ -15,6 +15,12 @@ interface DialogLike {
   showSaveDialog(options: { title: string; defaultPath: string; filters: { name: string; extensions: string[] }[] }): Promise<{ canceled: boolean; filePath?: string }>
   showOpenDialog(options: { title: string; properties: ['openFile']; filters: { name: string; extensions: string[] }[] }): Promise<{ canceled: boolean; filePaths: string[] }>
 }
+interface BoundedReadHandle {
+  stat(): Promise<{ size: number; isFile(): boolean }>
+  read(buffer: Uint8Array): Promise<{ bytesRead: number }>
+  close(): Promise<void>
+}
+interface BoundedReadFileSystem { open(path: string, flags: 'r'): Promise<BoundedReadHandle> }
 
 type ExportRepository = Pick<MeetingRepository, 'requireById' | 'listSpeakers' | 'listTranscript' | 'listSummarySections' | 'listActionItems'>
 type TemplateLookup = Pick<TemplateRepository, 'findById'>
@@ -32,6 +38,33 @@ async function atomicWrite(destination: string, bytes: Uint8Array | string): Pro
     await rm(temporary, { force: true }).catch(() => undefined)
     throw error
   }
+}
+
+export async function readBoundedArchiveFile(
+  path: string,
+  fileSystem: BoundedReadFileSystem = { open: (value, flags) => open(value, flags) as unknown as Promise<BoundedReadHandle> },
+  maxBytes = MAX_ARCHIVE_BYTES,
+): Promise<Uint8Array> {
+  const handle = await fileSystem.open(path, 'r')
+  try {
+    const before = await handle.stat()
+    if (!before.isFile()) throw new Error('Archive selection is not a regular file')
+    if (!Number.isSafeInteger(before.size) || before.size < 0 || before.size > maxBytes) throw new Error('Archive is too large (100MB maximum)')
+    const chunks: Uint8Array[] = []; let total = 0
+    while (total <= maxBytes) {
+      const buffer = new Uint8Array(Math.min(64 * 1024, maxBytes + 1 - total))
+      const { bytesRead } = await handle.read(buffer)
+      if (bytesRead === 0) break
+      if (!Number.isSafeInteger(bytesRead) || bytesRead < 0 || bytesRead > buffer.byteLength) throw new Error('Archive read failed')
+      chunks.push(buffer.slice(0, bytesRead)); total += bytesRead
+    }
+    if (total > maxBytes) throw new Error('Archive is too large (100MB maximum)')
+    const after = await handle.stat()
+    if (after.size !== before.size || total !== before.size) throw new Error('Archive changed while it was being read')
+    const result = new Uint8Array(total); let offset = 0
+    for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.byteLength }
+    return result
+  } finally { await handle.close() }
 }
 
 function failure(code: 'EXPORT_FAILED' | 'IMPORT_FAILED' | 'INVALID_ARCHIVE', error: unknown): ArchiveOperationResult {
@@ -78,9 +111,7 @@ export function registerArchiveHandlers(
     try {
       const selected = await dialog.showOpenDialog({ title: 'Nnote 가져오기', properties: ['openFile'], filters: [{ name: 'Nnote', extensions: ['nnote'] }] })
       if (selected.canceled || selected.filePaths.length !== 1) return { status: 'cancelled' }
-      const info = await stat(selected.filePaths[0])
-      if (!info.isFile() || info.size > MAX_ARCHIVE_BYTES) return { status: 'failure', code: 'INVALID_ARCHIVE', message: 'The selected archive is invalid.' }
-      const result = await importMeetingArchive(await readFile(selected.filePaths[0]), database, recordingsDirectory)
+      const result = await importMeetingArchive(await readBoundedArchiveFile(selected.filePaths[0]), database, recordingsDirectory)
       return { status: 'success', meetingId: result.meetingId, includedAudio: result.importedAudio }
     } catch (error) { return failure('INVALID_ARCHIVE', error) }
   })

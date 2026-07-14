@@ -5,6 +5,7 @@ import { SummaryTemplateSectionSchema } from '../../shared/contracts/template'
 
 export const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024
 export const MAX_ARCHIVE_ENTRIES = 5
+export const MAX_COMPRESSION_RATIO = 100
 export const ARCHIVE_ENTRIES = ['manifest.json', 'meeting.json', 'transcript.json', 'summary.json', 'audio.webm'] as const
 const required = ARCHIVE_ENTRIES.slice(0, 4)
 
@@ -84,13 +85,92 @@ function parseJson<T>(name: string, bytes: Uint8Array, schema: z.ZodType<T>): T 
   catch (error) { throw new Error(`Invalid ${name} JSON`, { cause: error }) }
 }
 
+function vint(bytes: Uint8Array, offset: number): { length: number; value: number; unknown: boolean } | null {
+  if (offset >= bytes.length) return null
+  const first = bytes[offset]!
+  let mask = 0x80; let length = 1
+  while (length <= 8 && (first & mask) === 0) { mask >>>= 1; length++ }
+  if (length > 8 || offset + length > bytes.length) return null
+  let value = first & (mask - 1)
+  let unknown = value === mask - 1
+  for (let index = 1; index < length; index++) {
+    value = value * 256 + bytes[offset + index]!
+    unknown = unknown && bytes[offset + index] === 0xff
+  }
+  return { length, value, unknown }
+}
+
+function isWebm(bytes: Uint8Array): boolean {
+  if (bytes.length < 17 || ![0x1a, 0x45, 0xdf, 0xa3].every((value, index) => bytes[index] === value)) return false
+  const headerSize = vint(bytes, 4)
+  if (headerSize === null || headerSize.unknown) return false
+  const headerStart = 4 + headerSize.length
+  const headerEnd = headerStart + headerSize.value
+  if (headerEnd > bytes.length || headerSize.value > 16 * 1024) return false
+  let offset = headerStart; let documentType: string | null = null
+  while (offset < headerEnd) {
+    const first = bytes[offset]!
+    let idLength = 1; let mask = 0x80
+    while (idLength <= 4 && (first & mask) === 0) { mask >>>= 1; idLength++ }
+    if (idLength > 4 || offset + idLength > headerEnd) return false
+    const id = bytes.subarray(offset, offset + idLength); offset += idLength
+    const size = vint(bytes, offset)
+    if (size === null || size.unknown) return false
+    offset += size.length
+    if (offset + size.value > headerEnd) return false
+    if (idLength === 2 && id[0] === 0x42 && id[1] === 0x82) documentType = new TextDecoder().decode(bytes.subarray(offset, offset + size.value))
+    offset += size.value
+  }
+  if (offset !== headerEnd || documentType !== 'webm') return false
+  if (headerEnd + 5 > bytes.length || ![0x18, 0x53, 0x80, 0x67].every((value, index) => bytes[headerEnd + index] === value)) return false
+  const segmentSize = vint(bytes, headerEnd + 4)
+  if (segmentSize === null) return false
+  const payloadStart = headerEnd + 4 + segmentSize.length
+  return segmentSize.unknown || payloadStart + segmentSize.value <= bytes.length
+}
+
+function assertUnique(values: readonly string[], label: string): void {
+  if (new Set(values).size !== values.length) throw new Error(`Duplicate ${label}`)
+}
+
+function validateSemantics(archive: Omit<ParsedArchive, 'audio' | 'manifest'>): void {
+  assertUnique(archive.transcript.speakers.map(({ id }) => id), 'speaker IDs')
+  assertUnique(archive.transcript.segments.map(({ id }) => id), 'transcript segment IDs')
+  assertUnique(archive.summary.sections.map(({ id }) => id), 'summary section IDs')
+  assertUnique(archive.summary.actionItems.map(({ id }) => id), 'action item IDs')
+  const speakers = new Set(archive.transcript.speakers.map(({ id }) => id))
+  for (const segment of archive.transcript.segments) if (segment.speakerId !== null && !speakers.has(segment.speakerId)) throw new Error('Transcript references an unknown speaker')
+  for (const item of archive.summary.actionItems) if (item.assigneeSpeakerId !== null && !speakers.has(item.assigneeSpeakerId)) throw new Error('Action item references an unknown speaker')
+  const template = archive.meeting.template
+  if (template === null) {
+    if (archive.summary.sections.length > 0 || archive.summary.actionItems.length > 0) throw new Error('Summary requires a template snapshot')
+    return
+  }
+  assertUnique(template.sections.map(({ id }) => id), 'template section IDs')
+  const actionDefinitions = template.sections.filter(({ kind }) => kind === 'action_items')
+  if (actionDefinitions.length > 1) throw new Error('Template has ambiguous action item sections')
+  if (archive.summary.actionItems.length > 0 && actionDefinitions.length !== 1) throw new Error('Action items require an action_items template section')
+  if (archive.summary.sections.length === 0 && archive.summary.actionItems.length === 0) return
+  if (archive.summary.sections.length !== template.sections.length) throw new Error('Every template section requires exactly one summary section')
+  const byReference = new Map(archive.summary.sections.map((section) => [section.templateSectionId, section]))
+  if (byReference.size !== archive.summary.sections.length) throw new Error('Duplicate summary template section reference')
+  for (const [orderIndex, definition] of template.sections.entries()) {
+    const section = byReference.get(definition.id)
+    if (section === undefined) throw new Error('Summary references an unknown or missing template section')
+    if (section.kind !== definition.kind) throw new Error('Summary section kind does not match template')
+    if (section.orderIndex !== orderIndex) throw new Error('Summary section order is ambiguous')
+  }
+}
+
 export function parseArchive(bytes: Uint8Array): ParsedArchive {
   const central = centralEntries(bytes)
-  let total = 0
+  let total = 0; let compressedTotal = 0
   const names = new Set<string>()
   for (const entry of central) {
     total += entry.uncompressedSize
+    compressedTotal += entry.compressedSize
     if (entry.compressedSize > MAX_ARCHIVE_BYTES || entry.uncompressedSize > MAX_ARCHIVE_BYTES || total > MAX_ARCHIVE_BYTES) throw new Error('Archive entry exceeds 100MB')
+    if ((entry.compressedSize === 0 && entry.uncompressedSize > 0) || (entry.compressedSize > 0 && entry.uncompressedSize / entry.compressedSize > MAX_COMPRESSION_RATIO)) throw new Error('Archive entry compression ratio exceeds 100:1')
     if (!ARCHIVE_ENTRIES.includes(entry.name as typeof ARCHIVE_ENTRIES[number])) throw new Error(`Archive entry path is not allowed: ${entry.name}`)
     const normalized = entry.name.normalize('NFKC').toLocaleLowerCase('en-US')
     if (names.has(normalized)) throw new Error('Archive contains duplicate entry names')
@@ -100,6 +180,7 @@ export function parseArchive(bytes: Uint8Array): ParsedArchive {
     if ((entry.flags & 1) !== 0) throw new Error('Encrypted archive entries are not allowed')
     if (host === 3 && (unixMode & 0xf000) === 0xa000) throw new Error('Archive symlink entries are not allowed')
   }
+  if ((compressedTotal === 0 && total > 0) || (compressedTotal > 0 && total / compressedTotal > MAX_COMPRESSION_RATIO)) throw new Error('Archive aggregate compression ratio exceeds 100:1')
   for (const name of required) if (!names.has(name)) throw new Error(`Archive entry is missing: ${name}`)
   let files: Record<string, Uint8Array>
   try { files = unzipSync(bytes) } catch (error) { throw new Error('Archive decompression failed', { cause: error }) }
@@ -114,12 +195,14 @@ export function parseArchive(bytes: Uint8Array): ParsedArchive {
   const actualPayload = central.map((e) => e.name).filter((n) => n !== 'manifest.json').sort()
   if (JSON.stringify([...manifest.entries].sort()) !== JSON.stringify(actualPayload)) throw new Error('Archive manifest entries do not match ZIP entries')
   const audio = files['audio.webm'] ?? null
-  if (audio !== null && (audio.byteLength < 4 || audio[0] !== 0x1a || audio[1] !== 0x45 || audio[2] !== 0xdf || audio[3] !== 0xa3)) throw new Error('Archive audio is not WebM')
-  return {
+  if (audio !== null && !isWebm(audio)) throw new Error('Archive audio is not a structurally valid WebM')
+  const parsed = {
     manifest,
     meeting: parseJson('meeting.json', files['meeting.json'], ArchiveMeetingSchema),
     transcript: parseJson('transcript.json', files['transcript.json'], ArchiveTranscriptSchema),
     summary: parseJson('summary.json', files['summary.json'], ArchiveSummarySchema),
     audio,
   }
+  validateSemantics(parsed)
+  return parsed
 }

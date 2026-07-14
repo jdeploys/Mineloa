@@ -4,10 +4,21 @@ import { basename } from 'node:path'
 import type Database from 'better-sqlite3'
 import { completedPartPath } from '../recording/recordingPaths'
 import { parseArchive } from './archiveSchema'
+import { importJournalPath, importStagedAudioPath, syncDirectory, writeImportJournal } from './importJournal'
+
+export { reconcileImportJournals } from './importJournal'
 
 export interface ImportedMeetingResult { meetingId: string; importedAudio: boolean }
+export type ImportFaultPhase = 'after-journal' | 'after-database-commit' | 'after-audio-rename'
+export interface ImportFaultOptions { interruptAt?: ImportFaultPhase; failAt?: ImportFaultPhase }
+class SimulatedImportCrash extends Error { constructor() { super('Simulated crash during Nnote import') } }
 
-export async function importMeetingArchive(bytes: Uint8Array, database: Database.Database, recordingsDirectory: string): Promise<ImportedMeetingResult> {
+function injectFault(options: ImportFaultOptions, phase: ImportFaultPhase): void {
+  if (options.interruptAt === phase) throw new SimulatedImportCrash()
+  if (options.failAt === phase) throw new Error('Injected failure during Nnote import')
+}
+
+export async function importMeetingArchive(bytes: Uint8Array, database: Database.Database, recordingsDirectory: string, fault: ImportFaultOptions = {}): Promise<ImportedMeetingResult> {
   const archive = parseArchive(bytes)
   const meetingId = randomUUID()
   const speakerIds = new Map(archive.transcript.speakers.map((speaker) => [speaker.id, randomUUID()]))
@@ -28,14 +39,19 @@ export async function importMeetingArchive(bytes: Uint8Array, database: Database
     throw new Error('Summary sections require an archived template snapshot')
   }
 
-  await mkdir(recordingsDirectory, { recursive: true })
   const finalPath = archive.audio === null ? null : completedPartPath(recordingsDirectory, meetingId, 0)
-  const temporaryPath = finalPath === null ? null : `${finalPath}.${randomUUID()}.importing`
+  const temporaryPath = finalPath === null ? null : importStagedAudioPath(recordingsDirectory, meetingId)
+  const journalPath = finalPath === null ? null : importJournalPath(recordingsDirectory, meetingId)
+  let databaseCommitted = false
+  let finalOwned = false
   try {
     if (archive.audio !== null && temporaryPath !== null && finalPath !== null) {
+      await mkdir(recordingsDirectory, { recursive: true })
       const handle = await open(temporaryPath, 'wx')
       try { await handle.writeFile(archive.audio); await handle.sync() } finally { await handle.close() }
-      await rename(temporaryPath, finalPath)
+      await syncDirectory(recordingsDirectory)
+      await writeImportJournal(recordingsDirectory, meetingId)
+      injectFault(fault, 'after-journal')
     }
 
     database.exec('BEGIN IMMEDIATE')
@@ -61,11 +77,32 @@ export async function importMeetingArchive(bytes: Uint8Array, database: Database
       for (const item of archive.summary.actionItems) database.prepare('INSERT INTO action_items (id, meeting_id, content, assignee_speaker_id, due_at, completed) VALUES (?, ?, ?, ?, ?, ?)')
         .run(randomUUID(), meetingId, item.content, item.assigneeSpeakerId === null ? null : speakerIds.get(item.assigneeSpeakerId), item.dueAt, item.completed ? 1 : 0)
       database.exec('COMMIT')
+      databaseCommitted = true
     } catch (error) { database.exec('ROLLBACK'); throw error }
+    injectFault(fault, 'after-database-commit')
+    if (temporaryPath !== null && finalPath !== null && journalPath !== null) {
+      await rename(temporaryPath, finalPath)
+      finalOwned = true
+      await syncDirectory(recordingsDirectory)
+      injectFault(fault, 'after-audio-rename')
+      await rm(journalPath, { force: true })
+      await syncDirectory(recordingsDirectory)
+    }
     return { meetingId, importedAudio: archive.audio !== null }
   } catch (error) {
+    if (error instanceof SimulatedImportCrash) throw error
+    if (databaseCommitted) {
+      database.exec('BEGIN IMMEDIATE')
+      try {
+        database.prepare('DELETE FROM meetings WHERE id = ?').run(meetingId)
+        if (templateId !== null) database.prepare('DELETE FROM summary_templates WHERE id = ?').run(templateId)
+        database.exec('COMMIT')
+      } catch (cleanupError) { database.exec('ROLLBACK'); throw new AggregateError([error, cleanupError], 'Import and rollback failed') }
+    }
     if (temporaryPath !== null) await rm(temporaryPath, { force: true }).catch(() => undefined)
-    if (finalPath !== null) await rm(finalPath, { force: true }).catch(() => undefined)
+    if (finalPath !== null && finalOwned) await rm(finalPath, { force: true }).catch(() => undefined)
+    if (journalPath !== null) await rm(journalPath, { force: true }).catch(() => undefined)
+    if (journalPath !== null) await syncDirectory(recordingsDirectory).catch(() => undefined)
     throw error
   }
 }

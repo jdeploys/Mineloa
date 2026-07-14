@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -6,10 +6,11 @@ import { openDatabase } from '../../src/main/db/database'
 import { MeetingRepository } from '../../src/main/db/meetingRepository'
 import { TemplateRepository } from '../../src/main/db/templateRepository'
 import { exportMeetingArchive } from '../../src/main/archive/exportMeeting'
-import { importMeetingArchive } from '../../src/main/archive/importMeeting'
+import { importMeetingArchive, reconcileImportJournals } from '../../src/main/archive/importMeeting'
 import { parseArchive } from '../../src/main/archive/archiveSchema'
 
 describe('Nnote archive round trip', () => {
+  const minimalWebm = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x87, 0x42, 0x82, 0x84, 0x77, 0x65, 0x62, 0x6d, 0x18, 0x53, 0x80, 0x67, 0xff])
   const roots: string[] = []
   afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
 
@@ -20,14 +21,14 @@ describe('Nnote archive round trip', () => {
     const sourceDb = openDatabase(join(root, 'source.sqlite')); const targetDb = openDatabase(join(root, 'target.sqlite'))
     const sectionId = '10000000-0000-4000-8000-000000000009'
     const now = '2026-07-15T00:00:00.000Z'
-    const template = { id: 'custom-template', name: '고객 회의', isDefault: false, sections: [{ id: sectionId, title: '핵심 요약', kind: 'paragraph' as const, prompt: '요약' }], createdAt: now, updatedAt: now }
+    const template = { id: 'custom-template', name: '고객 회의', isDefault: false, sections: [{ id: sectionId, title: '할 일', kind: 'action_items' as const, prompt: '할 일' }], createdAt: now, updatedAt: now }
     new TemplateRepository(sourceDb).save(template)
-    const audioName = 'meeting.part-0.webm'; const audio = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3])
+    const audioName = 'meeting.part-0.webm'; const audio = minimalWebm
     await writeFile(join(sourceRecordings, audioName), audio)
     sourceDb.prepare(`INSERT INTO meetings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run('original', '고객 회의', now, now, 5000, 'completed', 'keep', audioName, audio.byteLength, template.id)
     sourceDb.prepare('INSERT INTO speakers VALUES (?, ?, ?)').run('0:B', 'original', '홍길동')
     sourceDb.prepare('INSERT INTO transcript_segments VALUES (?, ?, ?, ?, ?, ?)').run('seg-old', 'original', '0:B', 0, 5000, '진행합니다')
-    sourceDb.prepare('INSERT INTO summary_sections VALUES (?, ?, ?, ?, ?, ?)').run('sum-old', 'original', sectionId, 'paragraph', JSON.stringify({ text: '요약', items: [] }), 0)
+    sourceDb.prepare('INSERT INTO summary_sections VALUES (?, ?, ?, ?, ?, ?)').run('sum-old', 'original', sectionId, 'action_items', JSON.stringify({ text: '', items: [] }), 0)
     sourceDb.prepare('INSERT INTO action_items VALUES (?, ?, ?, ?, ?, ?)').run('act-old', 'original', '배포', '0:B', null, 0)
 
     const exported = await exportMeetingArchive('original', new MeetingRepository(sourceDb), new TemplateRepository(sourceDb), sourceRecordings)
@@ -59,13 +60,60 @@ describe('Nnote archive round trip', () => {
     await mkdir(sourceRecordings); await mkdir(targetRecordings)
     const sourceDb = openDatabase(join(root, 'source.sqlite')); const targetDb = openDatabase(join(root, 'target.sqlite'))
     const now = '2026-07-15T00:00:00.000Z'; const audioName = 'safe.webm'
-    await writeFile(join(sourceRecordings, audioName), new Uint8Array([0x1a, 0x45, 0xdf, 0xa3]))
-    sourceDb.prepare('INSERT INTO meetings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('source', '회의', now, now, 1, 'completed', 'keep', audioName, 4, null)
+    await writeFile(join(sourceRecordings, audioName), minimalWebm)
+    sourceDb.prepare('INSERT INTO meetings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('source', '회의', now, now, 1, 'completed', 'keep', audioName, minimalWebm.byteLength, null)
     const exported = await exportMeetingArchive('source', new MeetingRepository(sourceDb), new TemplateRepository(sourceDb), sourceRecordings)
     targetDb.exec("CREATE TRIGGER reject_import BEFORE INSERT ON meetings BEGIN SELECT RAISE(ABORT, 'forced'); END")
     await expect(importMeetingArchive(exported.bytes, targetDb, targetRecordings)).rejects.toThrow(/forced/)
     expect(targetDb.prepare('SELECT count(*) count FROM meetings').get()).toEqual({ count: 0 })
     expect((await import('node:fs/promises')).readdir(targetRecordings)).resolves.toEqual([])
     sourceDb.close(); targetDb.close()
+  })
+
+  it.each([
+    ['after-journal', false, false],
+    ['after-database-commit', true, true],
+    ['after-audio-rename', true, true],
+  ] as const)('reconciles a simulated crash %s', async (phase, rowExistsBefore, audioExistsAfter) => {
+    const root = await mkdtemp(join(tmpdir(), `nnote-archive-${phase}-`)); roots.push(root)
+    const sourceRecordings = join(root, 'source'); const targetRecordings = join(root, 'target')
+    await mkdir(sourceRecordings); await mkdir(targetRecordings)
+    const sourceDb = openDatabase(join(root, 'source.sqlite')); const targetDb = openDatabase(join(root, 'target.sqlite'))
+    const now = '2026-07-15T00:00:00.000Z'; await writeFile(join(sourceRecordings, 'a.webm'), minimalWebm)
+    sourceDb.prepare('INSERT INTO meetings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('source', '회의', now, now, 1, 'completed', 'keep', 'a.webm', minimalWebm.byteLength, null)
+    const bytes = (await exportMeetingArchive('source', new MeetingRepository(sourceDb), new TemplateRepository(sourceDb), sourceRecordings)).bytes
+    await expect(importMeetingArchive(bytes, targetDb, targetRecordings, { interruptAt: phase })).rejects.toThrow(/simulated crash/i)
+    expect((targetDb.prepare('SELECT count(*) count FROM meetings').get() as any).count > 0).toBe(rowExistsBefore)
+    expect((await readdir(targetRecordings)).some((name) => name.endsWith('.import.json'))).toBe(true)
+    await reconcileImportJournals(targetDb, targetRecordings)
+    expect((await readdir(targetRecordings)).some((name) => name.endsWith('.import.json') || name.endsWith('.importing'))).toBe(false)
+    expect((targetDb.prepare('SELECT count(*) count FROM meetings').get() as any).count > 0).toBe(rowExistsBefore)
+    expect((await readdir(targetRecordings)).some((name) => name.endsWith('.webm'))).toBe(audioExistsAfter)
+    sourceDb.close(); targetDb.close()
+  })
+
+  it.each(['after-journal', 'after-database-commit', 'after-audio-rename'] as const)('rolls back rows and journal-owned files on an ordinary exception %s', async (phase) => {
+    const root = await mkdtemp(join(tmpdir(), `nnote-archive-exception-${phase}-`)); roots.push(root)
+    const sourceRecordings = join(root, 'source'); const targetRecordings = join(root, 'target')
+    await mkdir(sourceRecordings); await mkdir(targetRecordings)
+    const sourceDb = openDatabase(join(root, 'source.sqlite')); const targetDb = openDatabase(join(root, 'target.sqlite'))
+    const now = '2026-07-15T00:00:00.000Z'; await writeFile(join(sourceRecordings, 'a.webm'), minimalWebm)
+    sourceDb.prepare('INSERT INTO meetings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('source', '회의', now, now, 1, 'completed', 'keep', 'a.webm', minimalWebm.byteLength, null)
+    const bytes = (await exportMeetingArchive('source', new MeetingRepository(sourceDb), new TemplateRepository(sourceDb), sourceRecordings)).bytes
+    await expect(importMeetingArchive(bytes, targetDb, targetRecordings, { failAt: phase })).rejects.toThrow(/injected failure/i)
+    expect(targetDb.prepare('SELECT count(*) count FROM meetings').get()).toEqual({ count: 0 })
+    expect(await readdir(targetRecordings)).toEqual([])
+    sourceDb.close(); targetDb.close()
+  })
+
+  it('preserves files and reports a safe error for a corrupt recovery journal', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nnote-corrupt-journal-')); roots.push(root)
+    const recordings = join(root, 'recordings'); await mkdir(recordings)
+    const database = openDatabase(join(root, 'target.sqlite'))
+    const journal = join(recordings, 'owned.import.json'); const preserved = join(recordings, 'preserved.webm.importing')
+    await writeFile(journal, '{'); await writeFile(preserved, minimalWebm)
+    await expect(reconcileImportJournals(database, recordings)).rejects.toThrow(/corrupt.*preserved/i)
+    expect(await readdir(recordings)).toEqual(['owned.import.json', 'preserved.webm.importing'])
+    database.close()
   })
 })
