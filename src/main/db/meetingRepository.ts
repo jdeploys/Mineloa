@@ -1,8 +1,11 @@
 import type Database from 'better-sqlite3'
+import { randomUUID } from 'node:crypto'
 import {
   MeetingSchema,
+  SpeakerSchema,
   TranscriptSegmentSchema,
   type Meeting,
+  type Speaker,
   type TranscriptSegment,
 } from '../../shared/contracts/meeting'
 import { assertMeetingTransition } from '../domain/meetingState'
@@ -27,6 +30,12 @@ interface TranscriptSegmentRow {
   start_ms: number
   end_ms: number
   text: string
+}
+
+interface SpeakerRow {
+  id: string
+  meeting_id: string
+  display_name: string
 }
 
 function toMeeting(row: MeetingRow): Meeting {
@@ -227,5 +236,96 @@ export class MeetingRepository {
       )
       .all(meetingId) as TranscriptSegmentRow[]
     return rows.map(toTranscriptSegment)
+  }
+
+  listSpeakers(meetingId: string): Speaker[] {
+    const rows = this.database
+      .prepare('SELECT * FROM speakers WHERE meeting_id = ? ORDER BY id')
+      .all(meetingId) as SpeakerRow[]
+    return rows.map((row) =>
+      SpeakerSchema.parse({
+        id: row.id,
+        meetingId: row.meeting_id,
+        displayName: row.display_name,
+      }),
+    )
+  }
+
+  beginTranscription(meetingId: string): Meeting {
+    return inTransaction(this.database, () => {
+      const meeting = this.requireById(meetingId)
+      assertMeetingTransition(meeting.status, 'transcribing')
+      this.database
+        .prepare("UPDATE meetings SET status = 'transcribing', updated_at = ? WHERE id = ?")
+        .run(new Date().toISOString(), meetingId)
+      return this.requireById(meetingId)
+    })
+  }
+
+  completeTranscription(
+    meetingId: string,
+    speakers: readonly Speaker[],
+    segments: readonly TranscriptSegment[],
+  ): { speakers: Speaker[]; segments: TranscriptSegment[] } {
+    return inTransaction(this.database, () => {
+      const meeting = this.requireById(meetingId)
+      assertMeetingTransition(meeting.status, 'summarizing')
+      const upsertSpeaker = this.database.prepare(
+        `INSERT INTO speakers (id, meeting_id, display_name) VALUES (?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name
+         WHERE speakers.meeting_id = excluded.meeting_id`,
+      )
+      for (const value of speakers) {
+        const speaker = SpeakerSchema.parse(value)
+        if (speaker.meetingId !== meetingId) {
+          throw new Error('Speaker belongs to a different meeting')
+        }
+        upsertSpeaker.run(speaker.id, speaker.meetingId, speaker.displayName)
+      }
+
+      this.database.prepare('DELETE FROM transcript_segments WHERE meeting_id = ?').run(meetingId)
+      const insertSegment = this.database.prepare(
+        `INSERT INTO transcript_segments (id, meeting_id, speaker_id, start_ms, end_ms, text)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      for (const value of segments) {
+        const segment = TranscriptSegmentSchema.parse(value)
+        if (segment.meetingId !== meetingId) {
+          throw new Error('Transcript segment belongs to a different meeting')
+        }
+        insertSegment.run(
+          segment.id,
+          segment.meetingId,
+          segment.speakerId,
+          segment.startMs,
+          segment.endMs,
+          segment.text,
+        )
+      }
+      this.database
+        .prepare("UPDATE meetings SET status = 'summarizing', updated_at = ? WHERE id = ?")
+        .run(new Date().toISOString(), meetingId)
+      return { speakers: this.listSpeakers(meetingId), segments: this.listTranscript(meetingId) }
+    })
+  }
+
+  failTranscription(
+    meetingId: string,
+    error: { code: string; message: string; retryable: boolean },
+  ): Meeting {
+    return inTransaction(this.database, () => {
+      const meeting = this.requireById(meetingId)
+      assertMeetingTransition(meeting.status, 'failed')
+      const now = new Date().toISOString()
+      this.database
+        .prepare("UPDATE meetings SET status = 'failed', updated_at = ? WHERE id = ?")
+        .run(now, meetingId)
+      this.database.prepare(
+        `INSERT INTO processing_attempts
+          (id, meeting_id, stage, started_at, finished_at, succeeded, sanitized_error)
+         VALUES (?, ?, 'transcription', ?, ?, 0, ?)`,
+      ).run(randomUUID(), meetingId, now, now, JSON.stringify(error))
+      return this.requireById(meetingId)
+    })
   }
 }
