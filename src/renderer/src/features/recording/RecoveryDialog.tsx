@@ -60,11 +60,13 @@ export function RecoveryDialog({ items, recovery, onResolved }: RecoveryDialogPr
             <p>매니페스트를 읽을 수 없어 원본 바이트는 내보내기 전용으로 보존됩니다.</p>
           ) : (
             <>
-              <button disabled={busy} onClick={() => void decide(item.meetingId, 'recover')}>복구</button>
-              <button disabled={busy} onClick={() => void decide(item.meetingId, 'keep')}>현재 파일로 보관</button>
+              {item.kind === 'recoverable' && (
+                <button disabled={busy || confirming !== null} onClick={() => void decide(item.meetingId, 'recover')}>복구</button>
+              )}
+              <button disabled={busy || confirming !== null} onClick={() => void decide(item.meetingId, 'keep')}>현재 파일로 보관</button>
             </>
           )}
-          <button style={destructiveStyle} data-destructive="true" disabled={busy} onClick={() => setConfirming(item.meetingId)}>폐기</button>
+          <button style={destructiveStyle} data-destructive="true" disabled={busy || confirming !== null} onClick={() => setConfirming(item.meetingId)}>폐기</button>
         </section>
       ))}
       {error !== null && <p role="alert">{error}</p>}

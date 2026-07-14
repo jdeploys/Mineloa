@@ -5,7 +5,7 @@ export interface RecoveryItem {
   createdAt: string
   durationMs: number
   byteCount: number
-  kind: 'recoverable' | 'exportOnly'
+  kind: 'recoverable' | 'finalizeOnly' | 'exportOnly'
 }
 
 export interface RecoveryApi {

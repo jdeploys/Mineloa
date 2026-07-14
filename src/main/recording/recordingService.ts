@@ -138,6 +138,7 @@ export class RecordingService {
 
     const completedManifest: SessionManifest = {
       ...manifest,
+      finalized: true,
       parts: manifest.parts.map((part) => ({ ...part, completed: true })),
     }
     await writeSessionManifest(this.recordingsDirectory, completedManifest)

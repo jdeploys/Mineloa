@@ -43,12 +43,25 @@ describe('RecoveryDialog', () => {
     expect(screen.getByRole('button', { name: '폐기' })).toHaveStyle({ backgroundColor: '#b42318', color: '#ffffff' })
     expect(screen.getByRole('button', { name: '복구' })).not.toHaveAttribute('data-destructive')
     await user.click(screen.getByRole('button', { name: '폐기' }))
+    expect(screen.getByRole('button', { name: '복구' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '현재 파일로 보관' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '폐기' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '복구' }))
+    expect(recovery.recover).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '취소' }))
     expect(recovery.discard).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: '폐기' }))
     await user.click(screen.getByRole('button', { name: '영구 폐기 확인' }))
     expect(recovery.discard).toHaveBeenCalledWith('meeting-1', { explicitDelete: true })
+  })
+
+  it('offers keep but not resume for a finalization-only stop crash', () => {
+    render(<RecoveryDialog items={[{ ...item, kind: 'finalizeOnly' as const }]} recovery={{ recover: vi.fn(), keepAsFile: vi.fn(), discard: vi.fn() }} onResolved={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: '복구' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '현재 파일로 보관' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '폐기' })).toBeInTheDocument()
   })
 
   it('shows corrupt recovery as export-only and keeps destructive discard behind confirmation', () => {

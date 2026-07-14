@@ -105,6 +105,69 @@ describe('RecoveryService', () => {
     h.database.close()
   })
 
+  it('offers only finalization for a stop crash after every part was finalized', async () => {
+    const h = harness()
+    h.meetings.create(meeting('stop-crash', 'recording'))
+    const completed = completedPartPath(h.recordings, 'stop-crash', 0)
+    writeFileSync(completed, Buffer.from([2, 4, 6]))
+    writeFileSync(manifestPath(h.recordings, 'stop-crash'), JSON.stringify({
+      version: 1,
+      meetingId: 'stop-crash',
+      activePartIndex: 0,
+      totalBytes: 3,
+      durationMs: 2_000,
+      finalized: true,
+      parts: [{ partIndex: 0, lastChunkIndex: 0, byteCount: 3, durationMs: 2_000, completed: true }],
+    }))
+    h.meetings.updateRecordingProgress('stop-crash', 3, 2_000)
+
+    expect(await h.recovery.scan()).toEqual([
+      expect.objectContaining({ meetingId: 'stop-crash', kind: 'finalizeOnly' }),
+    ])
+    await expect(h.recovery.recover('stop-crash')).rejects.toThrow(/cannot be resumed/i)
+    await h.recovery.keepAsFile('stop-crash')
+
+    expect(h.meetings.requireById('stop-crash').status).toBe('recorded')
+    expect(readFileSync(completed)).toEqual(Buffer.from([2, 4, 6]))
+    await expect(stat(pendingPartPath(h.recordings, 'stop-crash', 0))).rejects.toMatchObject({ code: 'ENOENT' })
+    h.database.close()
+  })
+
+  it('keeps a completed rollover boundary resumable when stop finalization never began', async () => {
+    const h = harness()
+    h.meetings.create(meeting('rollover-crash', 'recording'))
+    writeFileSync(completedPartPath(h.recordings, 'rollover-crash', 0), Buffer.from([8, 9]))
+    writeFileSync(manifestPath(h.recordings, 'rollover-crash'), JSON.stringify({
+      version: 1, meetingId: 'rollover-crash', activePartIndex: 1, totalBytes: 2,
+      durationMs: 1_000, finalized: false,
+      parts: [{ partIndex: 0, lastChunkIndex: 0, byteCount: 2, durationMs: 1_000, completed: true }],
+    }))
+
+    expect(await h.recovery.scan()).toEqual([
+      expect.objectContaining({ meetingId: 'rollover-crash', kind: 'recoverable' }),
+    ])
+    expect(await h.recovery.recover('rollover-crash')).toMatchObject({ activePartIndex: 1, nextChunkIndex: 0 })
+    await h.recording.close()
+    h.database.close()
+  })
+
+  it('consumes only the successful recovery decision and leaves unresolved items actionable', async () => {
+    const h = harness()
+    await interrupted(h, 'first')
+    await interrupted(h, 'second')
+    await h.recovery.scan()
+
+    await h.recovery.recover('first')
+    await expect(h.recovery.keepAsFile('first')).rejects.toThrow(/startup recovery/i)
+    await expect(h.recovery.discard('first', { explicitDelete: true })).rejects.toThrow(/startup recovery/i)
+    expect((await h.recovery.scan()).map(({ meetingId }) => meetingId)).toEqual(['second'])
+
+    await h.recovery.keepAsFile('second')
+    expect(h.meetings.requireById('second').status).toBe('recorded')
+    await h.recording.close()
+    h.database.close()
+  })
+
   it('requires explicit deletion and makes confirmed discard retry-safe', async () => {
     const h = harness()
     await interrupted(h)
@@ -132,6 +195,40 @@ describe('RecoveryService', () => {
     expect(readFileSync(pending)).toEqual(Buffer.from([4, 5, 6, 7]))
     await expect(h.recovery.recover('corrupt')).rejects.toThrow(/cannot be resumed/i)
     expect(readFileSync(pending)).toEqual(Buffer.from([4, 5, 6, 7]))
+    h.database.close()
+  })
+
+  it.each([
+    ['active part outside the cursor', { activePartIndex: 99 }],
+    ['non-contiguous part indices', { parts: [
+      { partIndex: 0, lastChunkIndex: 0, byteCount: 2, durationMs: 1_000, completed: true },
+      { partIndex: 2, lastChunkIndex: 0, byteCount: 2, durationMs: 2_000, completed: false },
+    ], activePartIndex: 2, totalBytes: 4 }],
+    ['completed part after active part', { parts: [
+      { partIndex: 0, lastChunkIndex: 0, byteCount: 2, durationMs: 1_000, completed: false },
+      { partIndex: 1, lastChunkIndex: 0, byteCount: 2, durationMs: 2_000, completed: true },
+    ], activePartIndex: 0, totalBytes: 4 }],
+    ['incoherent aggregate bytes', { totalBytes: 99 }],
+    ['invalid finalization marker', { finalized: 'yes' }],
+  ])('preserves bytes as exportOnly for %s', async (_name, overrides) => {
+    const h = harness()
+    const id = `topology-${roots.length}`
+    h.meetings.create(meeting(id, 'recording'))
+    writeFileSync(pendingPartPath(h.recordings, id, 0), Buffer.from([1, 2]))
+    writeFileSync(completedPartPath(h.recordings, id, 1), Buffer.from([3, 4]))
+    const base = {
+      version: 1, meetingId: id, activePartIndex: 1, totalBytes: 4, durationMs: 2_000,
+      parts: [
+        { partIndex: 0, lastChunkIndex: 0, byteCount: 2, durationMs: 1_000, completed: true },
+        { partIndex: 1, lastChunkIndex: 0, byteCount: 2, durationMs: 2_000, completed: false },
+      ],
+    }
+    writeFileSync(manifestPath(h.recordings, id), JSON.stringify({ ...base, ...overrides }))
+
+    const [item] = await h.recovery.scan()
+    expect(item).toMatchObject({ meetingId: id, kind: 'exportOnly', byteCount: 4 })
+    expect(readFileSync(pendingPartPath(h.recordings, id, 0))).toEqual(Buffer.from([1, 2]))
+    expect(readFileSync(completedPartPath(h.recordings, id, 1))).toEqual(Buffer.from([3, 4]))
     h.database.close()
   })
 })

@@ -16,6 +16,7 @@ export interface SessionManifest {
   activePartIndex: number
   totalBytes: number
   durationMs: number
+  finalized?: boolean
   parts: RecordingPartManifest[]
 }
 
@@ -26,6 +27,7 @@ export function createSessionManifest(meetingId: string): SessionManifest {
     activePartIndex: 0,
     totalBytes: 0,
     durationMs: 0,
+    finalized: false,
     parts: [],
   }
 }
@@ -47,6 +49,9 @@ function parseSessionManifest(value: unknown, meetingId: string): SessionManifes
   assertNonNegativeInteger(manifest.activePartIndex, 'activePartIndex')
   assertNonNegativeInteger(manifest.totalBytes, 'totalBytes')
   assertNonNegativeInteger(manifest.durationMs, 'durationMs')
+  if (manifest.finalized !== undefined && typeof manifest.finalized !== 'boolean') {
+    throw new Error('Invalid recording manifest finalized')
+  }
 
   const parts = manifest.parts.map((value, index): RecordingPartManifest => {
     if (typeof value !== 'object' || value === null) {
@@ -81,6 +86,7 @@ function parseSessionManifest(value: unknown, meetingId: string): SessionManifes
     activePartIndex: manifest.activePartIndex,
     totalBytes: manifest.totalBytes,
     durationMs: manifest.durationMs,
+    finalized: manifest.finalized === true,
     parts,
   }
 }
