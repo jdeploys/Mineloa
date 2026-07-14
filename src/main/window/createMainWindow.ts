@@ -30,6 +30,7 @@ export function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 640,
     webPreferences: getWindowWebPreferences(preload),
   })
 

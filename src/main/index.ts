@@ -52,7 +52,7 @@ startSingleInstanceApp(app, BrowserWindow, () => {
       recordingsDirectory,
     )
     registerProcessingHandlers(ipcMain, processingService)
-    registerMeetingHandlers(ipcMain, meetings)
+    registerMeetingHandlers(ipcMain, meetings, templateService)
     registerMediaProtocol(protocol, meetings, recordingsDirectory)
 
     createMainWindow()

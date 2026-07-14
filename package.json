@@ -12,6 +12,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
+    "test:visual": "playwright test tests/visual",
     "lint": "eslint .",
     "package:win": "electron-builder --win",
     "package:mac": "electron-builder --mac"

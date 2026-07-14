@@ -67,6 +67,9 @@ const meetings: DesktopApi['meetings'] = Object.freeze({
   renameSpeaker: (meetingId: string, speakerId: string, displayName: string) => ipcRenderer.invoke(
     'meetings:rename-speaker', meetingId, speakerId, displayName,
   ).then((value) => SpeakerSchema.parse(value)),
+  cancelEmptyRecording: (meetingId: string, options: { explicitDelete: true }) => ipcRenderer.invoke(
+    'meetings:cancel-empty-recording', MeetingIdSchema.parse(meetingId), options,
+  ),
 })
 
 const desktopApi: DesktopApi = Object.freeze({ settings, recording, recovery, templates, processing, meetings })

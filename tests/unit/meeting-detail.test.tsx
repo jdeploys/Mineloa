@@ -18,9 +18,10 @@ const documentFixture = (): MeetingDocument => ({
   speakers: [{ id: '0:B', meetingId: 'meeting-1', displayName: '화자 B' }],
   transcript: [{ id: 's1', meetingId: 'meeting-1', speakerId: '0:B', startMs: 1_000, endMs: 2_500, text: '원본 발언입니다.' }],
   summarySections: [
-    { id: 'a', meetingId: 'meeting-1', templateSectionId: '10000000-0000-4000-8000-000000000001', kind: 'paragraph', text: '0:B가 제안을 설명했습니다.', items: [], orderIndex: 0 },
-    { id: 'b', meetingId: 'meeting-1', templateSectionId: '10000000-0000-4000-8000-000000000002', kind: 'bullet_list', text: '', items: ['제안을 채택합니다.'], orderIndex: 1 },
-    { id: 'c', meetingId: 'meeting-1', templateSectionId: '10000000-0000-4000-8000-000000000004', kind: 'bullet_list', text: '', items: ['근거를 검토했습니다.'], orderIndex: 3 },
+    { id: 'a', title: '핵심 요약', meetingId: 'meeting-1', templateSectionId: '10000000-0000-4000-8000-000000000001', kind: 'paragraph', text: '0:B가 제안을 설명했습니다.', items: [], orderIndex: 0 },
+    { id: 'b', title: '결정사항', meetingId: 'meeting-1', templateSectionId: '10000000-0000-4000-8000-000000000002', kind: 'bullet_list', text: '', items: ['제안을 채택합니다.'], orderIndex: 1 },
+    { id: 'action-section', title: '할 일', meetingId: 'meeting-1', templateSectionId: '10000000-0000-4000-8000-000000000003', kind: 'action_items', text: '', items: ['이 문구는 주요 논의가 아닙니다.'], orderIndex: 2 },
+    { id: 'c', title: '주요 논의', meetingId: 'meeting-1', templateSectionId: '10000000-0000-4000-8000-000000000004', kind: 'bullet_list', text: '', items: ['근거를 검토했습니다.'], orderIndex: 3 },
   ],
   actionItems: [{ id: 'todo', meetingId: 'meeting-1', content: '초안 작성', assigneeSpeakerId: '0:B', dueAt: null, completed: false }],
 })
@@ -65,5 +66,13 @@ describe('single-document meeting detail', () => {
     await user.click(screen.getByRole('button', { name: '화자 B 이름 저장' }))
     expect(screen.getByText('00:01–00:02')).toBeVisible()
     expect(screen.getByText('원본 발언입니다.')).toBeVisible()
+  })
+
+  it('maps the real default action and discussion sections by stable identity in Markdown', () => {
+    render(<MeetingDetail document={documentFixture()} onBack={vi.fn()} onRenameSpeaker={vi.fn()} />)
+    const preview = screen.getByTestId('markdown-preview')
+    expect(preview).toHaveTextContent('## 주요 논의')
+    expect(preview).toHaveTextContent('근거를 검토했습니다.')
+    expect(preview).not.toHaveTextContent('이 문구는 주요 논의가 아닙니다.')
   })
 })

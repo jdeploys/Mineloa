@@ -24,8 +24,8 @@ export function Dashboard({ meetings, recordingControls, onOpenMeeting, onNaviga
       <button className="brand" type="button" onClick={() => onNavigate('all')} aria-label="Nnote 홈">Nnote</button>
       <nav aria-label="주요 메뉴">
         <button type="button" onClick={() => onNavigate('all')}>전체 기록</button>
-        <button type="button" onClick={() => onNavigate('templates')}>요약 템플릿</button>
-        <button type="button" onClick={() => onNavigate('settings')}>설정</button>
+        <button type="button" data-focus-key="nav-templates" onClick={() => onNavigate('templates')}>요약 템플릿</button>
+        <button type="button" data-focus-key="nav-settings" onClick={() => onNavigate('settings')}>설정</button>
       </nav>
     </header>
     <main className="dashboard">
@@ -47,7 +47,7 @@ export function Dashboard({ meetings, recordingControls, onOpenMeeting, onNaviga
         {meetings.length === 0 ? <p className="empty-state">최근 기록이 없습니다.</p> :
           <ul className="meeting-list">
             {meetings.map((meeting) => <li key={meeting.id}>
-              <button className="meeting-row" type="button" onClick={() => onOpenMeeting(meeting.id)}>
+              <button className="meeting-row" data-focus-key={`meeting-${meeting.id}`} type="button" onClick={() => onOpenMeeting(meeting.id)}>
                 <span className="meeting-copy">
                   <strong>{meeting.title}</strong>
                   <span>{formatDate(meeting.createdAt)} · {formatDuration(meeting.durationMs)}</span>

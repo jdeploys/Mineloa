@@ -18,12 +18,17 @@ export const PublicMeetingSchema = z.object({
 }).strict()
 export type PublicMeeting = z.infer<typeof PublicMeetingSchema>
 
+export const DocumentSummarySectionSchema = StoredSummarySectionSchema.extend({
+  title: z.string().trim().min(1).max(200),
+}).strict()
+export type DocumentSummarySection = z.infer<typeof DocumentSummarySectionSchema>
+
 export const MeetingDocumentSchema = z.object({
   meeting: PublicMeetingSchema,
   audioUrl: z.string().startsWith('nnote-media://meeting/').nullable(),
   speakers: z.array(SpeakerSchema),
   transcript: z.array(TranscriptSegmentSchema),
-  summarySections: z.array(StoredSummarySectionSchema),
+  summarySections: z.array(DocumentSummarySectionSchema),
   actionItems: z.array(StoredActionItemSchema),
 }).strict()
 export type MeetingDocument = z.infer<typeof MeetingDocumentSchema>
@@ -40,4 +45,5 @@ export interface MeetingsApi {
   get(meetingId: string): Promise<MeetingDocument>
   createRecording(input: CreateRecordingMeetingInput): Promise<PublicMeeting>
   renameSpeaker(meetingId: string, speakerId: string, displayName: string): Promise<z.infer<typeof SpeakerSchema>>
+  cancelEmptyRecording(meetingId: string, options: { explicitDelete: true }): Promise<void>
 }
