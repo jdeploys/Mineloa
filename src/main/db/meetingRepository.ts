@@ -5,6 +5,7 @@ import {
   type Meeting,
   type TranscriptSegment,
 } from '../../shared/contracts/meeting'
+import { assertMeetingTransition } from '../domain/meetingState'
 
 interface MeetingRow {
   id: string
@@ -108,6 +109,65 @@ export class MeetingRepository {
       throw new Error(`Meeting ${id} was not found`)
     }
     return meeting
+  }
+
+  updateRecordingProgress(id: string, audioByteCount: number, durationMs: number): Meeting {
+    if (!Number.isSafeInteger(audioByteCount) || audioByteCount < 0) {
+      throw new Error('Recording byte count must be a non-negative safe integer')
+    }
+    if (!Number.isSafeInteger(durationMs) || durationMs < 0) {
+      throw new Error('Recording duration must be a non-negative safe integer')
+    }
+    return inTransaction(this.database, () => {
+      const meeting = this.requireById(id)
+      if (meeting.status !== 'recording' && meeting.status !== 'recoverable') {
+        throw new Error(`Meeting ${id} is not available for recording progress`)
+      }
+      this.database
+        .prepare(
+          `UPDATE meetings
+           SET audio_byte_count = ?, duration_ms = ?, updated_at = ?
+           WHERE id = ?`,
+        )
+        .run(audioByteCount, durationMs, new Date().toISOString(), id)
+      return this.requireById(id)
+    })
+  }
+
+  completeRecording(
+    id: string,
+    audioByteCount: number,
+    durationMs: number,
+    audioPath: string | null,
+  ): Meeting {
+    return inTransaction(this.database, () => {
+      const meeting = this.requireById(id)
+      assertMeetingTransition(meeting.status, 'recorded')
+      this.database
+        .prepare(
+          `UPDATE meetings
+           SET status = 'recorded', audio_byte_count = ?, duration_ms = ?,
+               audio_path = ?, updated_at = ?
+           WHERE id = ?`,
+        )
+        .run(audioByteCount, durationMs, audioPath, new Date().toISOString(), id)
+      return this.requireById(id)
+    })
+  }
+
+  discardRecording(id: string): Meeting {
+    return inTransaction(this.database, () => {
+      const meeting = this.requireById(id)
+      assertMeetingTransition(meeting.status, 'deleted', { explicitDelete: true })
+      this.database
+        .prepare(
+          `UPDATE meetings
+           SET status = 'deleted', audio_path = NULL, audio_byte_count = 0, updated_at = ?
+           WHERE id = ?`,
+        )
+        .run(new Date().toISOString(), id)
+      return this.requireById(id)
+    })
   }
 
   replaceTranscript(meetingId: string, values: readonly TranscriptSegment[]): TranscriptSegment[] {
