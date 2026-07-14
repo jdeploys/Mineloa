@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -71,7 +71,9 @@ describe('Nnote archive round trip', () => {
   })
 
   it.each([
-    ['after-journal', false, false],
+    ['before-stage-open', false, false],
+    ['during-stage-write', false, false],
+    ['after-stage-fsync', false, false],
     ['after-database-commit', true, true],
     ['after-audio-rename', true, true],
   ] as const)('reconciles a simulated crash %s', async (phase, rowExistsBefore, audioExistsAfter) => {
@@ -84,7 +86,12 @@ describe('Nnote archive round trip', () => {
     const bytes = (await exportMeetingArchive('source', new MeetingRepository(sourceDb), new TemplateRepository(sourceDb), sourceRecordings)).bytes
     await expect(importMeetingArchive(bytes, targetDb, targetRecordings, { interruptAt: phase })).rejects.toThrow(/simulated crash/i)
     expect((targetDb.prepare('SELECT count(*) count FROM meetings').get() as any).count > 0).toBe(rowExistsBefore)
-    expect((await readdir(targetRecordings)).some((name) => name.endsWith('.import.json'))).toBe(true)
+    const interruptedFiles = await readdir(targetRecordings)
+    expect(interruptedFiles.some((name) => name.endsWith('.import.json'))).toBe(true)
+    expect(interruptedFiles.some((name) => name.endsWith('.importing'))).toBe(phase !== 'before-stage-open' && phase !== 'after-audio-rename')
+    const stagedName = interruptedFiles.find((name) => name.endsWith('.importing'))
+    if (phase === 'during-stage-write') expect((await stat(join(targetRecordings, stagedName!))).size).toBeLessThan(minimalWebm.byteLength)
+    if (phase === 'after-stage-fsync') expect((await stat(join(targetRecordings, stagedName!))).size).toBe(minimalWebm.byteLength)
     await reconcileImportJournals(targetDb, targetRecordings)
     expect((await readdir(targetRecordings)).some((name) => name.endsWith('.import.json') || name.endsWith('.importing'))).toBe(false)
     expect((targetDb.prepare('SELECT count(*) count FROM meetings').get() as any).count > 0).toBe(rowExistsBefore)
@@ -92,7 +99,7 @@ describe('Nnote archive round trip', () => {
     sourceDb.close(); targetDb.close()
   })
 
-  it.each(['after-journal', 'after-database-commit', 'after-audio-rename'] as const)('rolls back rows and journal-owned files on an ordinary exception %s', async (phase) => {
+  it.each(['before-stage-open', 'during-stage-write', 'after-stage-fsync', 'after-database-commit', 'after-audio-rename'] as const)('rolls back rows and journal-owned files on an ordinary exception %s', async (phase) => {
     const root = await mkdtemp(join(tmpdir(), `nnote-archive-exception-${phase}-`)); roots.push(root)
     const sourceRecordings = join(root, 'source'); const targetRecordings = join(root, 'target')
     await mkdir(sourceRecordings); await mkdir(targetRecordings)
@@ -114,6 +121,19 @@ describe('Nnote archive round trip', () => {
     await writeFile(journal, '{'); await writeFile(preserved, minimalWebm)
     await expect(reconcileImportJournals(database, recordings)).rejects.toThrow(/corrupt.*preserved/i)
     expect(await readdir(recordings)).toEqual(['owned.import.json', 'preserved.webm.importing'])
+    database.close()
+  })
+
+  it('cleans only strictly generated journal temp artifacts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'nnote-journal-temp-')); roots.push(root)
+    const recordings = join(root, 'recordings'); await mkdir(recordings)
+    const database = openDatabase(join(root, 'target.sqlite'))
+    const generated = `${'a'.repeat(64)}.import.json.tmp`
+    const unowned = 'notes.import.json.tmp'
+    await writeFile(join(recordings, generated), 'partial')
+    await writeFile(join(recordings, unowned), 'do not delete')
+    await reconcileImportJournals(database, recordings)
+    expect(await readdir(recordings)).toEqual([unowned])
     database.close()
   })
 })

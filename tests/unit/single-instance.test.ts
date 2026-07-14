@@ -32,4 +32,12 @@ describe('single instance startup', () => {
     expect(window.restore).toHaveBeenCalledTimes(1)
     expect(window.focus).toHaveBeenCalledTimes(1)
   })
+
+  it('handles a second instance safely while startup has no window', () => {
+    const h = appHarness(true)
+    const windows = { getAllWindows: vi.fn(() => []) }
+    startSingleInstanceApp(h.app, windows, vi.fn())
+    expect(() => h.second()).not.toThrow()
+    expect(windows.getAllWindows).toHaveBeenCalledTimes(1)
+  })
 })

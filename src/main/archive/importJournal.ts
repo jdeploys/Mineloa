@@ -4,13 +4,17 @@ import type Database from 'better-sqlite3'
 import { z } from 'zod'
 import { completedPartPath, recordingFilePrefix } from '../recording/recordingPaths'
 
-const JournalSchema = z.object({ version: z.literal(1), meetingId: z.string().uuid() }).strict()
+const JournalSchema = z.object({ version: z.literal(1), meetingId: z.string().uuid(), state: z.literal('pending_stage') }).strict()
+const JOURNAL_TEMP_NAME = /^[a-f0-9]{64}\.import\.json\.tmp$/
 
 export function importJournalPath(recordingsDirectory: string, meetingId: string): string {
   return join(recordingsDirectory, `${recordingFilePrefix(meetingId)}import.json`)
 }
 export function importStagedAudioPath(recordingsDirectory: string, meetingId: string): string {
   return `${completedPartPath(recordingsDirectory, meetingId, 0)}.importing`
+}
+export function importJournalTemporaryPath(recordingsDirectory: string, meetingId: string): string {
+  return `${importJournalPath(recordingsDirectory, meetingId)}.tmp`
 }
 
 export async function syncDirectory(directory: string): Promise<void> {
@@ -24,9 +28,11 @@ export async function syncDirectory(directory: string): Promise<void> {
 
 export async function writeImportJournal(recordingsDirectory: string, meetingId: string): Promise<void> {
   const path = importJournalPath(recordingsDirectory, meetingId)
-  const handle = await open(path, 'wx')
-  try { await handle.writeFile(JSON.stringify({ version: 1, meetingId }), 'utf8'); await handle.sync() }
+  const temporaryPath = importJournalTemporaryPath(recordingsDirectory, meetingId)
+  const handle = await open(temporaryPath, 'wx')
+  try { await handle.writeFile(JSON.stringify({ version: 1, meetingId, state: 'pending_stage' }), 'utf8'); await handle.sync() }
   finally { await handle.close() }
+  await rename(temporaryPath, path)
   await syncDirectory(recordingsDirectory)
 }
 
@@ -39,6 +45,9 @@ export async function reconcileImportJournals(database: Database.Database, recor
   let names: string[]
   try { names = await readdir(recordingsDirectory) }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error }
+  const generatedTemps = names.filter((value) => JOURNAL_TEMP_NAME.test(value))
+  for (const name of generatedTemps) await rm(join(recordingsDirectory, name), { force: true })
+  if (generatedTemps.length > 0) await syncDirectory(recordingsDirectory)
   for (const name of names.filter((value) => value.endsWith('.import.json')).sort()) {
     const journalPath = join(recordingsDirectory, name)
     let journal: z.infer<typeof JournalSchema>

@@ -4,12 +4,12 @@ import { basename } from 'node:path'
 import type Database from 'better-sqlite3'
 import { completedPartPath } from '../recording/recordingPaths'
 import { parseArchive } from './archiveSchema'
-import { importJournalPath, importStagedAudioPath, syncDirectory, writeImportJournal } from './importJournal'
+import { importJournalPath, importJournalTemporaryPath, importStagedAudioPath, syncDirectory, writeImportJournal } from './importJournal'
 
 export { reconcileImportJournals } from './importJournal'
 
 export interface ImportedMeetingResult { meetingId: string; importedAudio: boolean }
-export type ImportFaultPhase = 'after-journal' | 'after-database-commit' | 'after-audio-rename'
+export type ImportFaultPhase = 'before-stage-open' | 'during-stage-write' | 'after-stage-fsync' | 'after-database-commit' | 'after-audio-rename'
 export interface ImportFaultOptions { interruptAt?: ImportFaultPhase; failAt?: ImportFaultPhase }
 class SimulatedImportCrash extends Error { constructor() { super('Simulated crash during Nnote import') } }
 
@@ -42,16 +42,25 @@ export async function importMeetingArchive(bytes: Uint8Array, database: Database
   const finalPath = archive.audio === null ? null : completedPartPath(recordingsDirectory, meetingId, 0)
   const temporaryPath = finalPath === null ? null : importStagedAudioPath(recordingsDirectory, meetingId)
   const journalPath = finalPath === null ? null : importJournalPath(recordingsDirectory, meetingId)
+  const journalTemporaryPath = finalPath === null ? null : importJournalTemporaryPath(recordingsDirectory, meetingId)
   let databaseCommitted = false
   let finalOwned = false
   try {
     if (archive.audio !== null && temporaryPath !== null && finalPath !== null) {
       await mkdir(recordingsDirectory, { recursive: true })
-      const handle = await open(temporaryPath, 'wx')
-      try { await handle.writeFile(archive.audio); await handle.sync() } finally { await handle.close() }
-      await syncDirectory(recordingsDirectory)
       await writeImportJournal(recordingsDirectory, meetingId)
-      injectFault(fault, 'after-journal')
+      injectFault(fault, 'before-stage-open')
+      const handle = await open(temporaryPath, 'wx')
+      try {
+        if (fault.interruptAt === 'during-stage-write' || fault.failAt === 'during-stage-write') {
+          await handle.writeFile(archive.audio.subarray(0, Math.max(1, Math.floor(archive.audio.byteLength / 2))))
+          injectFault(fault, 'during-stage-write')
+        }
+        await handle.writeFile(archive.audio)
+        await handle.sync()
+      } finally { await handle.close() }
+      await syncDirectory(recordingsDirectory)
+      injectFault(fault, 'after-stage-fsync')
     }
 
     database.exec('BEGIN IMMEDIATE')
@@ -102,6 +111,7 @@ export async function importMeetingArchive(bytes: Uint8Array, database: Database
     if (temporaryPath !== null) await rm(temporaryPath, { force: true }).catch(() => undefined)
     if (finalPath !== null && finalOwned) await rm(finalPath, { force: true }).catch(() => undefined)
     if (journalPath !== null) await rm(journalPath, { force: true }).catch(() => undefined)
+    if (journalTemporaryPath !== null) await rm(journalTemporaryPath, { force: true }).catch(() => undefined)
     if (journalPath !== null) await syncDirectory(recordingsDirectory).catch(() => undefined)
     throw error
   }
