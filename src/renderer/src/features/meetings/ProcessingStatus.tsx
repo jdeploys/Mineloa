@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ProcessingApi, ProcessingStatus as Status } from '../../../../shared/contracts/processing'
 
 export function ProcessingStatus({ meetingId, processing, initialStatus }: { meetingId: string; processing: ProcessingApi; initialStatus: Status }) {
   const [status, setStatus] = useState(initialStatus)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const currentMeeting = useRef(meetingId)
+  const requestGeneration = useRef(0)
+  currentMeeting.current = meetingId
 
   useEffect(() => processing.onProgress((next) => { if (next.meetingId === meetingId) setStatus(next) }), [meetingId, processing])
   useEffect(() => {
+    requestGeneration.current += 1
     setStatus(initialStatus)
     setPending(false)
     setError(null)
@@ -26,14 +30,24 @@ export function ProcessingStatus({ meetingId, processing, initialStatus }: { mee
 
   async function submit() {
     if (active) return
+    const requestedMeeting = meetingId
+    const generation = ++requestGeneration.current
     setPending(true)
     setError(null)
     try {
       const next = status.failedStage === null ? await processing.process(meetingId) : await processing.retry(meetingId)
-      setStatus(next)
+      if (currentMeeting.current === requestedMeeting && requestGeneration.current === generation) {
+        setStatus(next)
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '처리 요청에 실패했습니다.')
-    } finally { setPending(false) }
+      if (currentMeeting.current === requestedMeeting && requestGeneration.current === generation) {
+        setError(cause instanceof Error ? cause.message : '처리 요청에 실패했습니다.')
+      }
+    } finally {
+      if (currentMeeting.current === requestedMeeting && requestGeneration.current === generation) {
+        setPending(false)
+      }
+    }
   }
 
   return <section aria-label="AI 처리 상태">

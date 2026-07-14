@@ -18,43 +18,42 @@ import { RecordingService } from './recording/recordingService'
 import { RecoveryService } from './recording/recoveryService'
 import { createMainWindow } from './window/createMainWindow'
 import { TemplateService } from './templates/templateService'
+import { startSingleInstanceApp } from './app/singleInstance'
 
-const credentialStore = new KeyringCredentialStore()
-registerSettingsHandlers(ipcMain, credentialStore, new OpenAiKeyValidator())
+startSingleInstanceApp(app, BrowserWindow, () => {
+  const credentialStore = new KeyringCredentialStore()
+  registerSettingsHandlers(ipcMain, credentialStore, new OpenAiKeyValidator())
 
-app.whenReady().then(() => {
-  const userDataDirectory = app.getPath('userData')
-  const database = openDatabase(join(userDataDirectory, 'nnote.sqlite'))
-  const meetings = new MeetingRepository(database)
-  const recordingsDirectory = join(userDataDirectory, 'recordings')
-  const recordingService = new RecordingService(meetings, recordingsDirectory)
-  const templateService = new TemplateService(new TemplateRepository(database))
-  templateService.seedDefault()
-  registerTemplateHandlers(ipcMain, templateService)
-  registerRecordingHandlers(ipcMain, recordingService)
-  registerRecoveryHandlers(
-    ipcMain,
-    new RecoveryService(new MeetingRepository(database), recordingService, join(userDataDirectory, 'recordings')),
-  )
-  const processingService = new ProcessingService(
-    meetings,
-    new TranscriptionService(meetings, new OpenAiGateway(credentialStore), recordingsDirectory),
-    new SummaryService(meetings, templateService, new OpenAiSummaryGateway(credentialStore)),
-    recordingsDirectory,
-  )
-  registerProcessingHandlers(ipcMain, processingService)
+  app.whenReady().then(() => {
+    const userDataDirectory = app.getPath('userData')
+    const database = openDatabase(join(userDataDirectory, 'nnote.sqlite'))
+    const meetings = new MeetingRepository(database)
+    const recordingsDirectory = join(userDataDirectory, 'recordings')
+    const recordingService = new RecordingService(meetings, recordingsDirectory)
+    const templateService = new TemplateService(new TemplateRepository(database))
+    templateService.seedDefault()
+    registerTemplateHandlers(ipcMain, templateService)
+    registerRecordingHandlers(ipcMain, recordingService)
+    registerRecoveryHandlers(
+      ipcMain,
+      new RecoveryService(new MeetingRepository(database), recordingService, recordingsDirectory),
+    )
+    const processingService = new ProcessingService(
+      meetings,
+      new TranscriptionService(meetings, new OpenAiGateway(credentialStore), recordingsDirectory),
+      new SummaryService(meetings, templateService, new OpenAiSummaryGateway(credentialStore)),
+      recordingsDirectory,
+    )
+    registerProcessingHandlers(ipcMain, processingService)
 
-  createMainWindow()
+    createMainWindow()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow()
-    }
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    })
   })
-})
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
 })

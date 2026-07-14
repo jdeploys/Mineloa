@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { cleanup } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ProcessingStatus } from '../../src/renderer/src/features/meetings/ProcessingStatus'
+import type { ProcessingStatus as ProcessingStatusValue } from '../../src/shared/contracts/processing'
 
 afterEach(cleanup)
 
@@ -43,5 +44,19 @@ describe('ProcessingStatus', () => {
     await waitFor(() => expect(process).toHaveBeenCalledWith('m2'))
     expect(retry).not.toHaveBeenCalled()
     expect(screen.queryByText('old')).not.toBeInTheDocument()
+  })
+
+  it('ignores a deferred request result from the previously rendered meeting', async () => {
+    let resolveOld!: (value: ProcessingStatusValue) => void
+    const process = vi.fn((meetingId: string): Promise<ProcessingStatusValue> => meetingId === 'm1'
+      ? new Promise((resolve) => { resolveOld = resolve })
+      : Promise.resolve({ meetingId: 'm2', state: 'completed', failedStage: null, retryable: false, audioRequired: false, error: null }))
+    const processing = { getStatus: vi.fn(), process, retry: vi.fn(), onProgress: vi.fn(() => () => {}) }
+    const { rerender } = render(<ProcessingStatus meetingId="m1" processing={processing} initialStatus={{ meetingId: 'm1', state: 'recorded', failedStage: null, retryable: false, audioRequired: true, error: null }} />)
+    fireEvent.click(screen.getByRole('button', { name: '전사 및 요약 시작' }))
+    rerender(<ProcessingStatus meetingId="m2" processing={processing} initialStatus={{ meetingId: 'm2', state: 'recorded', failedStage: null, retryable: false, audioRequired: true, error: null }} />)
+    resolveOld({ meetingId: 'm1', state: 'completed', failedStage: null, retryable: false, audioRequired: false, error: null })
+    await waitFor(() => expect(screen.getByText('처리 대기')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: '전사 및 요약 시작' })).toBeEnabled()
   })
 })

@@ -38,6 +38,8 @@ export class ProcessingService {
     private readonly files: FilePort = { remove: (path) => rm(path, { force: true }) },
     private readonly ownerId: string = PROCESS_OWNER_ID,
   ) {
+    // The Electron composition root constructs this only after obtaining the
+    // single-instance lock, so another owner represents a crashed prior Main process.
     this.meetings.reconcileInterruptedProcessing(ownerId)
   }
 

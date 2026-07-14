@@ -88,9 +88,12 @@ const migration1 = `
 
 const migration2 = `
   ALTER TABLE processing_attempts ADD COLUMN owner_id TEXT;
-  CREATE UNIQUE INDEX processing_attempts_one_active_per_meeting
-    ON processing_attempts(meeting_id) WHERE finished_at IS NULL;
-  PRAGMA user_version = 2;
+`
+
+const finishDuplicateAttempt = `
+  UPDATE processing_attempts
+  SET finished_at = ?, succeeded = 0, sanitized_error = ?
+  WHERE id = ?
 `
 
 export function runMigrations(database: Database.Database): void {
@@ -112,6 +115,36 @@ export function runMigrations(database: Database.Database): void {
     database.exec('BEGIN IMMEDIATE')
     try {
       database.exec(migration2)
+      const active = database.prepare(
+        `SELECT p.id, p.meeting_id
+         FROM processing_attempts p
+         JOIN meetings m ON m.id = p.meeting_id
+         WHERE p.finished_at IS NULL
+         ORDER BY p.meeting_id,
+           CASE WHEN
+             (p.stage IN ('transcribing', 'transcription') AND m.status = 'transcribing') OR
+             (p.stage = 'summarizing' AND m.status = 'summarizing') OR
+             (p.stage = 'cleanup' AND m.status = 'completed')
+           THEN 0 ELSE 1 END,
+           p.started_at DESC, p.rowid DESC`,
+      ).all() as Array<{ id: string; meeting_id: string }>
+      const seen = new Set<string>()
+      const now = new Date().toISOString()
+      const interrupted = JSON.stringify({
+        code: 'PROCESSING_INTERRUPTED',
+        message: 'Processing was interrupted. Try again.',
+        retryable: true,
+      })
+      const finish = database.prepare(finishDuplicateAttempt)
+      for (const attempt of active) {
+        if (seen.has(attempt.meeting_id)) finish.run(now, interrupted, attempt.id)
+        else seen.add(attempt.meeting_id)
+      }
+      database.exec(`
+        CREATE UNIQUE INDEX processing_attempts_one_active_per_meeting
+          ON processing_attempts(meeting_id) WHERE finished_at IS NULL;
+        PRAGMA user_version = 2;
+      `)
       database.exec('COMMIT')
     } catch (error) {
       database.exec('ROLLBACK')

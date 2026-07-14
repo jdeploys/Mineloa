@@ -50,20 +50,20 @@ export class TranscriptionService {
     const ownAttempt = orchestration === undefined
       ? this.meetings.beginProcessingAttempt(meetingId, 'transcription', this.ownerId)
       : null
-    if (orchestration === undefined) {
-      this.meetings.beginTranscription(meetingId)
-    } else {
-      this.meetings.assertActiveProcessingAttempt(
-        orchestration.attemptId,
-        meetingId,
-        'transcribing',
-        orchestration.ownerId,
-      )
-      if (this.meetings.requireById(meetingId).status !== 'transcribing') {
-        throw new Error('Orchestrated transcription is not in the transcribing state')
-      }
-    }
     try {
+      if (orchestration === undefined) {
+        this.meetings.beginTranscription(meetingId)
+      } else {
+        this.meetings.assertActiveProcessingAttempt(
+          orchestration.attemptId,
+          meetingId,
+          'transcribing',
+          orchestration.ownerId,
+        )
+        if (this.meetings.requireById(meetingId).status !== 'transcribing') {
+          throw new Error('Orchestrated transcription is not in the transcribing state')
+        }
+      }
       const paths = await this.finalizedPartPaths(meetingId)
       const speakers = new Map<string, Speaker>()
       const segments: TranscriptSegment[] = []
@@ -103,11 +103,17 @@ export class TranscriptionService {
       return result
     } catch (error) {
       const typed = toOpenAiError(error)
-      this.meetings.failTranscription(meetingId, {
-        code: typed.code,
-        message: typed.message,
-        retryable: typed.retryable,
-      })
+      try {
+        if (this.meetings.requireById(meetingId).status === 'transcribing') {
+          this.meetings.failTranscription(meetingId, {
+            code: typed.code,
+            message: typed.message,
+            retryable: typed.retryable,
+          })
+        }
+      } catch {
+        // Attempt completion below must not be blocked by secondary failure persistence.
+      }
       if (ownAttempt !== null) {
         this.meetings.finishProcessingAttempt(ownAttempt.id, {
           succeeded: false,

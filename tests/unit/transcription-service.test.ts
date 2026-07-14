@@ -197,6 +197,19 @@ describe('toOpenAiError', () => {
 })
 
 describe('TranscriptionService', () => {
+  it('finishes its active attempt when the initial transcription transition throws', async () => {
+    const h = harness()
+    writeFileSync(completedPartPath(h.recordingsDirectory, 'meeting-1', 0), Buffer.from([1]))
+    const begin = vi.spyOn(h.meetings, 'beginTranscription').mockImplementationOnce(() => { throw new Error('forced transition failure') })
+    const gateway = { transcribe: vi.fn(async () => ({ durationSeconds: 1, segments: [] })) }
+    const service = new TranscriptionService(h.meetings, gateway, h.recordingsDirectory)
+    await expect(service.transcribeMeeting('meeting-1')).rejects.toMatchObject({ code: 'OPENAI_UNKNOWN' })
+    expect(gateway.transcribe).not.toHaveBeenCalled()
+    expect(h.meetings.latestProcessingAttempt('meeting-1')).toMatchObject({ succeeded: false, finishedAt: expect.any(String) })
+    begin.mockRestore()
+    await expect(service.transcribeMeeting('meeting-1')).resolves.toBeDefined()
+    h.database.close()
+  })
   it('transcribes finalized parts in order and normalizes stable part-scoped speakers', async () => {
     const h = harness()
     const second = completedPartPath(h.recordingsDirectory, 'meeting-1', 1)
