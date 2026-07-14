@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { OpenAiKeyValidator } from './ai/openAiKeyValidator'
+import { OpenAiGateway, OpenAiSummaryGateway } from './ai/openAiGateway'
+import { TranscriptionService } from './ai/transcriptionService'
+import { SummaryService } from './ai/summaryService'
+import { ProcessingService } from './ai/processingService'
 import { KeyringCredentialStore } from './credentials/keyringCredentialStore'
 import { openDatabase } from './db/database'
 import { MeetingRepository } from './db/meetingRepository'
@@ -9,20 +13,21 @@ import { registerRecordingHandlers } from './ipc/registerRecordingHandlers'
 import { registerRecoveryHandlers } from './ipc/registerRecoveryHandlers'
 import { registerSettingsHandlers } from './ipc/registerSettingsHandlers'
 import { registerTemplateHandlers } from './ipc/registerTemplateHandlers'
+import { registerProcessingHandlers } from './ipc/registerProcessingHandlers'
 import { RecordingService } from './recording/recordingService'
 import { RecoveryService } from './recording/recoveryService'
 import { createMainWindow } from './window/createMainWindow'
 import { TemplateService } from './templates/templateService'
 
-registerSettingsHandlers(ipcMain, new KeyringCredentialStore(), new OpenAiKeyValidator())
+const credentialStore = new KeyringCredentialStore()
+registerSettingsHandlers(ipcMain, credentialStore, new OpenAiKeyValidator())
 
 app.whenReady().then(() => {
   const userDataDirectory = app.getPath('userData')
   const database = openDatabase(join(userDataDirectory, 'nnote.sqlite'))
-  const recordingService = new RecordingService(
-    new MeetingRepository(database),
-    join(userDataDirectory, 'recordings'),
-  )
+  const meetings = new MeetingRepository(database)
+  const recordingsDirectory = join(userDataDirectory, 'recordings')
+  const recordingService = new RecordingService(meetings, recordingsDirectory)
   const templateService = new TemplateService(new TemplateRepository(database))
   templateService.seedDefault()
   registerTemplateHandlers(ipcMain, templateService)
@@ -31,6 +36,13 @@ app.whenReady().then(() => {
     ipcMain,
     new RecoveryService(new MeetingRepository(database), recordingService, join(userDataDirectory, 'recordings')),
   )
+  const processingService = new ProcessingService(
+    meetings,
+    new TranscriptionService(meetings, new OpenAiGateway(credentialStore), recordingsDirectory),
+    new SummaryService(meetings, templateService, new OpenAiSummaryGateway(credentialStore)),
+    recordingsDirectory,
+  )
+  registerProcessingHandlers(ipcMain, processingService, BrowserWindow)
 
   createMainWindow()
 

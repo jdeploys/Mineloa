@@ -41,7 +41,7 @@ export class SummaryService {
     const parsed = createSummaryResponseSchema(template, knownSpeakerIds).safeParse(json)
     if (!parsed.success) throw safeOpenAiError('OPENAI_MALFORMED_SUMMARY')
     const sectionById = new Map(parsed.data.sections.map((section) => [section.sectionId, section]))
-    return this.meetings.replaceSummary(
+    return this.meetings.completeSummary(
       meetingId,
       template.sections.map((definition, orderIndex) => {
         const section = sectionById.get(definition.id)!

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { DesktopApi } from '../shared/contracts/desktopApi'
 import type { RecordingChunk } from '../shared/contracts/recording'
 import type { CreateTemplateInput, UpdateTemplateInput } from '../shared/contracts/template'
+import { ProcessingStatusSchema, type ProcessingStatus } from '../shared/contracts/processing'
 
 const settings: DesktopApi['settings'] = Object.freeze({
   saveApiKey: (value: string) => ipcRenderer.invoke('settings:save-api-key', value),
@@ -34,6 +35,20 @@ const templates: DesktopApi['templates'] = Object.freeze({
   delete: (id: string) => ipcRenderer.invoke('templates:delete', id),
 })
 
-const desktopApi: DesktopApi = Object.freeze({ settings, recording, recovery, templates })
+const processing: DesktopApi['processing'] = Object.freeze({
+  getStatus: (meetingId: string) => ipcRenderer.invoke('processing:get-status', meetingId),
+  process: (meetingId: string) => ipcRenderer.invoke('processing:process', meetingId),
+  retry: (meetingId: string) => ipcRenderer.invoke('processing:retry', meetingId),
+  onProgress: (listener: (status: ProcessingStatus) => void) => {
+    const handler = (_event: unknown, value: unknown) => {
+      const parsed = ProcessingStatusSchema.safeParse(value)
+      if (parsed.success) listener(parsed.data)
+    }
+    ipcRenderer.on('processing:progress', handler)
+    return () => { ipcRenderer.removeListener('processing:progress', handler) }
+  },
+})
+
+const desktopApi: DesktopApi = Object.freeze({ settings, recording, recovery, templates, processing })
 
 contextBridge.exposeInMainWorld('desktopApi', desktopApi)
