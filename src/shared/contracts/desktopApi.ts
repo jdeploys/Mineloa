@@ -4,6 +4,7 @@ import type { RecoveryApi } from './recovery'
 import type { TemplatesApi } from './template'
 import type { ProcessingApi } from './processing'
 import type { MeetingsApi } from './meetingsApi'
+import type { ArchiveApi } from './archive'
 
 export interface DesktopApi {
   readonly settings: SettingsApi
@@ -12,6 +13,7 @@ export interface DesktopApi {
   readonly templates: TemplatesApi
   readonly processing: ProcessingApi
   readonly meetings: MeetingsApi
+  readonly archive: ArchiveApi
 }
 
 declare global {

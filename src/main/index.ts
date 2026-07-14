@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, protocol } from 'electron'
 import { join } from 'node:path'
 import { OpenAiKeyValidator } from './ai/openAiKeyValidator'
 import { OpenAiGateway, OpenAiSummaryGateway } from './ai/openAiGateway'
@@ -21,6 +21,7 @@ import { TemplateService } from './templates/templateService'
 import { startSingleInstanceApp } from './app/singleInstance'
 import { registerMediaProtocol } from './media/registerMediaProtocol'
 import { registerMeetingHandlers } from './ipc/registerMeetingHandlers'
+import { registerArchiveHandlers } from './ipc/registerArchiveHandlers'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'nnote-media',
@@ -37,7 +38,8 @@ startSingleInstanceApp(app, BrowserWindow, () => {
     const meetings = new MeetingRepository(database)
     const recordingsDirectory = join(userDataDirectory, 'recordings')
     const recordingService = new RecordingService(meetings, recordingsDirectory)
-    const templateService = new TemplateService(new TemplateRepository(database))
+    const templateRepository = new TemplateRepository(database)
+    const templateService = new TemplateService(templateRepository)
     templateService.seedDefault()
     registerTemplateHandlers(ipcMain, templateService)
     registerRecordingHandlers(ipcMain, recordingService)
@@ -53,6 +55,7 @@ startSingleInstanceApp(app, BrowserWindow, () => {
     )
     registerProcessingHandlers(ipcMain, processingService)
     registerMeetingHandlers(ipcMain, meetings, templateService)
+    registerArchiveHandlers(ipcMain, dialog, meetings, templateRepository, database, recordingsDirectory)
     registerMediaProtocol(protocol, meetings, recordingsDirectory)
 
     createMainWindow()

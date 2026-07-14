@@ -11,6 +11,7 @@ import {
   type CreateRecordingMeetingInput,
 } from '../shared/contracts/meetingsApi'
 import { SpeakerSchema } from '../shared/contracts/meeting'
+import { ArchiveOperationResultSchema } from '../shared/contracts/archive'
 
 const settings: DesktopApi['settings'] = Object.freeze({
   saveApiKey: (value: string) => ipcRenderer.invoke('settings:save-api-key', value),
@@ -70,6 +71,12 @@ const meetings: DesktopApi['meetings'] = Object.freeze({
   ).then((value) => SpeakerSchema.parse(value)),
 })
 
-const desktopApi: DesktopApi = Object.freeze({ settings, recording, recovery, templates, processing, meetings })
+const archive: DesktopApi['archive'] = Object.freeze({
+  exportMeeting: (meetingId: string) => ipcRenderer.invoke('archive:export-meeting', MeetingIdSchema.parse(meetingId)).then((value) => ArchiveOperationResultSchema.parse(value)),
+  exportMarkdown: (meetingId: string) => ipcRenderer.invoke('archive:export-markdown', MeetingIdSchema.parse(meetingId)).then((value) => ArchiveOperationResultSchema.parse(value)),
+  importMeeting: () => ipcRenderer.invoke('archive:import-meeting').then((value) => ArchiveOperationResultSchema.parse(value)),
+})
+
+const desktopApi: DesktopApi = Object.freeze({ settings, recording, recovery, templates, processing, meetings, archive })
 
 contextBridge.exposeInMainWorld('desktopApi', desktopApi)
