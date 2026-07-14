@@ -38,6 +38,21 @@ afterEach(() => {
 })
 
 describe('MeetingRepository', () => {
+  it('lists recent non-deleted meetings newest first without changing recording state', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'nnote-recent-'))
+    const database = openDatabase(join(directory, 'meetings.sqlite'))
+    const repository = new MeetingRepository(database)
+    const base = recordingMeeting()
+    repository.create({ ...base, id: 'older', createdAt: '2026-07-14T00:00:00.000Z', updatedAt: '2026-07-14T00:00:00.000Z' })
+    repository.create({ ...base, id: 'newer', createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-07-15T00:00:00.000Z', status: 'recoverable' })
+    repository.create({ ...base, id: 'deleted', createdAt: '2026-07-16T00:00:00.000Z', updatedAt: '2026-07-16T00:00:00.000Z', status: 'deleted' })
+
+    expect(repository.listRecent().map(({ id }) => id)).toEqual(['newer', 'older'])
+    expect(repository.requireById('newer').status).toBe('recoverable')
+    database.close()
+    rmSync(directory, { recursive: true, force: true })
+  })
+
   it('persists recording status, byte count, and audio policy across reopen', () => {
     const databasePath = temporaryDatabasePath()
     const firstDatabase = openDatabase(databasePath)

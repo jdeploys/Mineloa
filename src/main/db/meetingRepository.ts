@@ -182,6 +182,16 @@ export class MeetingRepository {
     return rows.map(toMeeting)
   }
 
+  listRecent(limit = 100): Meeting[] {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+      throw new Error('Recent meeting limit must be between 1 and 500')
+    }
+    const rows = this.database
+      .prepare("SELECT * FROM meetings WHERE status != 'deleted' ORDER BY created_at DESC, id DESC LIMIT ?")
+      .all(limit) as MeetingRow[]
+    return rows.map(toMeeting)
+  }
+
   transitionRecordingStatus(id: string, status: 'recording' | 'recoverable'): Meeting {
     return inTransaction(this.database, () => {
       const meeting = this.requireById(id)

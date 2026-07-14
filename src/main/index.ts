@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol } from 'electron'
 import { join } from 'node:path'
 import { OpenAiKeyValidator } from './ai/openAiKeyValidator'
 import { OpenAiGateway, OpenAiSummaryGateway } from './ai/openAiGateway'
@@ -19,6 +19,13 @@ import { RecoveryService } from './recording/recoveryService'
 import { createMainWindow } from './window/createMainWindow'
 import { TemplateService } from './templates/templateService'
 import { startSingleInstanceApp } from './app/singleInstance'
+import { registerMediaProtocol } from './media/registerMediaProtocol'
+import { registerMeetingHandlers } from './ipc/registerMeetingHandlers'
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'nnote-media',
+  privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+}])
 
 startSingleInstanceApp(app, BrowserWindow, () => {
   const credentialStore = new KeyringCredentialStore()
@@ -45,6 +52,8 @@ startSingleInstanceApp(app, BrowserWindow, () => {
       recordingsDirectory,
     )
     registerProcessingHandlers(ipcMain, processingService)
+    registerMeetingHandlers(ipcMain, meetings)
+    registerMediaProtocol(protocol, meetings, recordingsDirectory)
 
     createMainWindow()
 
