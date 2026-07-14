@@ -43,6 +43,48 @@ describe('TemplateService', () => {
     database.close()
   })
 
+  it('reconciles a valid but altered default exactly while leaving user templates untouched', () => {
+    const root = mkdtempSync(join(tmpdir(), 'nnote-template-altered-'))
+    directories.push(root)
+    const database = openDatabase(join(root, 'nnote.sqlite'))
+    const repository = new TemplateRepository(database)
+    const timestamp = '2026-07-14T00:00:00.000Z'
+    repository.save({
+      id: DEFAULT_TEMPLATE_ID,
+      name: '변형된 기본 템플릿',
+      isDefault: true,
+      sections: [{ id: '10000000-0000-4000-8000-000000000099', title: '변형', kind: 'paragraph', prompt: '변형된 지시문' }],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    const user = repository.save({
+      id: 'user-template',
+      name: '사용자 템플릿',
+      isDefault: false,
+      sections: [{ id: '10000000-0000-4000-8000-000000000098', title: '사용자', kind: 'bullet_list', prompt: '그대로 유지' }],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    const service = new TemplateService(repository)
+
+    const reconciled = service.seedDefault()
+
+    expect(reconciled).toMatchObject({ id: DEFAULT_TEMPLATE_ID, name: '기본 템플릿', isDefault: true })
+    expect(reconciled.sections).toEqual(DEFAULT_TEMPLATE_SECTIONS)
+    expect(service.get(user.id)).toEqual(user)
+    database.close()
+  })
+
+  it('does not rewrite an already exact default', () => {
+    const { database, service } = harness()
+    const before = JSON.stringify(service.get(DEFAULT_TEMPLATE_ID))
+
+    service.seedDefault()
+
+    expect(JSON.stringify(service.get(DEFAULT_TEMPLATE_ID))).toBe(before)
+    database.close()
+  })
+
   it('creates, renames, safely reorders, and deletes a user template while preserving stable UUID section ids', () => {
     const { database, service } = harness()
     const created = service.create({

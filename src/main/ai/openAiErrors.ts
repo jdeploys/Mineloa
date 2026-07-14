@@ -5,6 +5,7 @@ export type OpenAiErrorCode =
   | 'OPENAI_TIMEOUT'
   | 'OPENAI_NETWORK'
   | 'OPENAI_INVALID_AUDIO'
+  | 'OPENAI_INVALID_SUMMARY_REQUEST'
   | 'OPENAI_MALFORMED_RESPONSE'
   | 'OPENAI_MALFORMED_SUMMARY'
   | 'OPENAI_SUMMARY_REFUSED'
@@ -45,6 +46,10 @@ const safeDetails: Record<OpenAiErrorCode, { message: string; retryable: boolean
   },
   OPENAI_INVALID_AUDIO: {
     message: 'OpenAI could not process this audio file.',
+    retryable: false,
+  },
+  OPENAI_INVALID_SUMMARY_REQUEST: {
+    message: 'OpenAI could not accept the summary request.',
     retryable: false,
   },
   OPENAI_MALFORMED_RESPONSE: {
@@ -117,4 +122,11 @@ export function toOpenAiError(error: unknown): OpenAiError {
   }
 
   return safeOpenAiError(code)
+}
+
+export function toSummaryOpenAiError(error: unknown): OpenAiError {
+  const classified = toOpenAiError(error)
+  return classified.code === 'OPENAI_INVALID_AUDIO'
+    ? safeOpenAiError('OPENAI_INVALID_SUMMARY_REQUEST')
+    : classified
 }

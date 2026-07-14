@@ -74,6 +74,25 @@ describe('OpenAiSummaryGateway', () => {
       retryable: expect.any(Boolean),
     })
   })
+
+  it.each([400, 413])('maps Responses API HTTP %i to a fixed summary-safe error without provider details', async (status) => {
+    const gateway = new OpenAiSummaryGateway(
+      { get: vi.fn().mockResolvedValue('placeholder'), set: vi.fn(), delete: vi.fn() },
+      () => ({ responses: { create: vi.fn(async () => {
+        throw Object.assign(new Error('provider canary invalid summary request'), { status })
+      }) } }),
+    )
+
+    const failure = await gateway.summarize({ input: 'x', schema: {} }).catch((error: unknown) => error)
+
+    expect(failure).toMatchObject({
+      code: 'OPENAI_INVALID_SUMMARY_REQUEST',
+      message: 'OpenAI could not accept the summary request.',
+      retryable: false,
+    })
+    expect(String(failure)).not.toContain('provider canary')
+    expect(String(failure)).not.toContain('audio')
+  })
 })
 
 describe('SummaryService', () => {
@@ -140,10 +159,19 @@ describe('SummaryService', () => {
     h.database.prepare('INSERT INTO summary_sections (id, meeting_id, template_section_id, kind, content_json, order_index) VALUES (?, ?, ?, ?, ?, ?)').run('old', 'meeting-1', h.template.sections[0]?.id, 'paragraph', JSON.stringify({ text: 'Old', items: [] }), 0)
     const beforeTranscript = JSON.stringify(h.meetings.listTranscript('meeting-1'))
     const beforeSummary = JSON.stringify(h.meetings.listSummarySections('meeting-1'))
-    const failure = Object.assign(new Error('safe'), { code: 'OPENAI_RATE_LIMITED', retryable: true })
-    const service = new SummaryService(h.meetings, h.templates, { summarize: vi.fn(async () => { throw failure }) })
+    const gateway = new OpenAiSummaryGateway(
+      { get: vi.fn().mockResolvedValue('placeholder'), set: vi.fn(), delete: vi.fn() },
+      () => ({ responses: { create: vi.fn(async () => {
+        throw Object.assign(new Error('provider canary invalid summary request'), { status: 400 })
+      }) } }),
+    )
+    const service = new SummaryService(h.meetings, h.templates, gateway)
 
-    await expect(service.summarizeMeeting('meeting-1')).rejects.toBe(failure)
+    await expect(service.summarizeMeeting('meeting-1')).rejects.toMatchObject({
+      code: 'OPENAI_INVALID_SUMMARY_REQUEST',
+      message: 'OpenAI could not accept the summary request.',
+      retryable: false,
+    })
     expect(JSON.stringify(h.meetings.listTranscript('meeting-1'))).toBe(beforeTranscript)
     expect(JSON.stringify(h.meetings.listSummarySections('meeting-1'))).toBe(beforeSummary)
     h.database.close()

@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs'
 import OpenAI from 'openai'
 import { z } from 'zod'
 import type { CredentialStore } from '../credentials/credentialStore'
-import { safeOpenAiError, toOpenAiError } from './openAiErrors'
+import { safeOpenAiError, toOpenAiError, toSummaryOpenAiError } from './openAiErrors'
 
 export interface TranscriptionRequest {
   filePath: string
@@ -152,7 +152,7 @@ export class OpenAiSummaryGateway implements OpenAiSummaryGatewayPort {
         },
       })
     } catch (error) {
-      throw toOpenAiError(error)
+      throw toSummaryOpenAiError(error)
     }
     const parsed = responsesResultSchema.safeParse(response)
     if (!parsed.success) throw safeOpenAiError('OPENAI_MALFORMED_SUMMARY')

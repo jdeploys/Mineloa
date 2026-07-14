@@ -150,6 +150,33 @@ describe('OpenAiGateway', () => {
     })
     expect(String(failure)).not.toContain('provider canary gateway 883')
   })
+
+  it('keeps HTTP 400 classified as invalid audio at the transcription gateway', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'nnote-gateway-invalid-audio-'))
+    directories.push(root)
+    const filePath = join(root, 'meeting.webm')
+    writeFileSync(filePath, Buffer.from([1]))
+    const gateway = new OpenAiGateway(
+      { get: vi.fn().mockResolvedValue('placeholder'), set: vi.fn(), delete: vi.fn() },
+      () => ({ audio: { transcriptions: { create: vi.fn(async (input: unknown) => {
+        for await (const _chunk of (input as { file: AsyncIterable<unknown> }).file) {
+          // consume the upload stream before returning the provider failure
+        }
+        throw Object.assign(new Error('provider canary invalid audio'), { status: 400 })
+      }) } } }),
+    )
+
+    await expect(gateway.transcribe({
+      filePath,
+      model: 'gpt-4o-transcribe-diarize',
+      responseFormat: 'diarized_json',
+      chunkingStrategy: 'auto',
+    })).rejects.toMatchObject({
+      code: 'OPENAI_INVALID_AUDIO',
+      message: 'OpenAI could not process this audio file.',
+      retryable: false,
+    })
+  })
 })
 
 describe('toOpenAiError', () => {

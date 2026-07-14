@@ -22,7 +22,15 @@ export class TemplateService {
 
   seedDefault(): SummaryTemplate {
     const existing = this.repository.findById(DEFAULT_TEMPLATE_ID)
-    return existing ?? this.repository.save(createDefaultTemplate())
+    if (existing === null) return this.repository.save(createDefaultTemplate())
+    const canonical = createDefaultTemplate()
+    const isExact = existing.name === canonical.name &&
+      JSON.stringify(existing.sections) === JSON.stringify(canonical.sections)
+    if (isExact) return existing
+    return this.repository.save({
+      ...canonical,
+      createdAt: existing.createdAt,
+    })
   }
 
   list(): SummaryTemplate[] {
