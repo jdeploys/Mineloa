@@ -41,4 +41,12 @@ describe('local runtime build contract', () => {
     expect(script).toContain("@('-c', $ConfigureCommand)")
     expect(script).toContain("@('-lc', $ConfigureCommand)")
   })
+
+  it('builds the platform-specific FFmpeg executable target without changing macOS', () => {
+    const windows = readFileSync(resolve('scripts/build-local-runtime.ps1'), 'utf8')
+    const mac = readFileSync(resolve('scripts/build-local-runtime.sh'), 'utf8')
+    expect(windows).toContain('make -j2 ffmpeg.exe')
+    expect(mac).toContain('ffmpeg)')
+    expect(mac).not.toContain('ffmpeg.exe')
+  })
 })

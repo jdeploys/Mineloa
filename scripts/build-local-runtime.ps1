@@ -60,7 +60,7 @@ try {
   $env:CHERE_INVOKING = '1'
   $ConfigureCommand = './configure ' + ($FfmpegFlags -join ' ')
   $FfmpegShellArguments = if ($FfmpegShell -eq 'msys2') { @('-c', $ConfigureCommand) } else { @('-lc', $ConfigureCommand) }
-  $MakeShellArguments = if ($FfmpegShell -eq 'msys2') { @('-c', 'make -j2 ffmpeg') } else { @('-lc', 'make -j2 ffmpeg') }
+  $MakeShellArguments = if ($FfmpegShell -eq 'msys2') { @('-c', 'make -j2 ffmpeg.exe') } else { @('-lc', 'make -j2 ffmpeg.exe') }
   Invoke-Checked $FfmpegShellProgram $FfmpegShellArguments (Join-Path $BuildRoot 'ffmpeg')
   Invoke-Checked $FfmpegShellProgram $MakeShellArguments (Join-Path $BuildRoot 'ffmpeg')
 
