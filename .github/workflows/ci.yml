@@ -16,11 +16,18 @@ jobs:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.12.0
           cache: npm
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -31,14 +38,25 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          npm run package:win
+          $env:FFMPEG_BASH = 'C:\msys64\usr\bin\bash.exe'
+          $env:MSYSTEM = 'MINGW64'
+          ./scripts/build-local-runtime.ps1 -Arch x64
+          npm run package:win:x64
           node scripts/verify-package.mjs dist/win-unpacked
       - name: Package and verify macOS (unsigned)
         if: runner.os == 'macOS'
         run: |
-          CSC_IDENTITY_AUTO_DISCOVERY=false npm run package:mac
-          node scripts/verify-package.mjs dist/mac*/Nnote.app
-      - uses: actions/upload-artifact@v4
+          set -euo pipefail
+          native_arch="$(uname -m)"
+          ./scripts/build-local-runtime.sh "$native_arch"
+          if [[ "$native_arch" == arm64 ]]; then
+            CSC_NAME=- CSC_IDENTITY_AUTO_DISCOVERY=false npm run package:mac:arm64 -- --config.mac.hardenedRuntime=false --config.mac.notarize=false
+            node scripts/verify-package.mjs dist/mac-arm64/Nnote.app
+          else
+            CSC_NAME=- CSC_IDENTITY_AUTO_DISCOVERY=false npm run package:mac:x64 -- --config.mac.hardenedRuntime=false --config.mac.notarize=false
+            node scripts/verify-package.mjs dist/mac/Nnote.app
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: nnote-${{ runner.os }}-${{ runner.arch }}
@@ -52,8 +70,8 @@ jobs:
   mac-visual-baseline:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.12.0
           cache: npm
@@ -67,11 +85,7 @@ jobs:
         if: steps.visual-compare.outcome == 'failure'
         run: |
           if [ -d test-results ]; then cp -R test-results visual-comparison-results; fi
-      - name: Generate unreviewed macOS candidate baselines
-        if: steps.visual-compare.outcome == 'failure'
-        continue-on-error: true
-        run: npm run test:visual:update
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: macos-visual-candidates-and-diffs

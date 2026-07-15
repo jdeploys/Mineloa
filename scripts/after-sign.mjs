@@ -5,7 +5,7 @@ export default async function signAdHocFallback(context) {
   const configuredIdentity = process.env.CSC_NAME?.trim()
   if (process.env.CSC_LINK || (configuredIdentity && configuredIdentity !== '-')) return
   const result = spawnSync('codesign', [
-    '--force', '--deep', '--options', 'runtime', '--timestamp=none', '--sign', '-', context.appOutDir.endsWith('.app')
+    '--force', '--deep', '--sign', '-', context.appOutDir.endsWith('.app')
       ? context.appOutDir
       : `${context.appOutDir}/${context.packager.appInfo.productFilename}.app`,
   ], { encoding: 'utf8', windowsHide: true })

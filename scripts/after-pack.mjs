@@ -15,8 +15,8 @@ export default async function signLocalRuntimeHelpers(context) {
     throw new Error('Nested helper signing failed: target')
   }
   const identity = process.env.CSC_NAME?.trim() || '-'
-  const timestamp = identity === '-' ? ['--timestamp=none'] : ['--timestamp']
+  const signingOptions = identity === '-' ? [] : ['--options', 'runtime', '--timestamp']
   for (const helper of ['whisper-cli', 'ffmpeg']) {
-    run('codesign', ['--force', '--options', 'runtime', ...timestamp, '--sign', identity, join(root, targets[0].name, helper)])
+    run('codesign', ['--force', ...signingOptions, '--sign', identity, join(root, targets[0].name, helper)])
   }
 }

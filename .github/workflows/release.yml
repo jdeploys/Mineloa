@@ -6,19 +6,19 @@ on:
     tags: ['v0.0.1']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   windows-x64:
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.12.0
           cache: npm
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
         with:
           msystem: MINGW64
           install: >-
@@ -45,7 +45,7 @@ jobs:
           Select-String -LiteralPath package-verification.log -SimpleMatch '"localRuntime":true'
       - name: Normalize release asset
         run: node scripts/prepare-release-assets.mjs .exe Nnote-0.0.1-windows-x64.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: diagnostics-windows-x64
           path: |
@@ -53,7 +53,7 @@ jobs:
             package-verification.log
             build/local-runtime/win32-x64/runtime-manifest.json
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-windows-x64
           path: release-assets/Nnote-0.0.1-windows-x64.exe
@@ -72,17 +72,9 @@ jobs:
             app-dir: dist/mac-arm64/Nnote.app
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
-    env:
-      CSC_LINK: ${{ secrets.CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      MAC_SIGNING_CONFIGURED: ${{ secrets.CSC_LINK != '' && secrets.CSC_KEY_PASSWORD != '' }}
-      MAC_NOTARIZATION_CONFIGURED: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.12.0
           cache: npm
@@ -90,37 +82,49 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - name: Generate Task 6 macOS visual baselines on native runner
+      - name: Compare committed reviewed macOS visual baselines
         run: |
+          set -euo pipefail
           npx playwright install chromium
-          npx playwright test tests/visual/processing-settings.visual.pw.ts --update-snapshots
           npx playwright test tests/visual/processing-settings.visual.pw.ts
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
-          name: visual-baselines-macos-${{ matrix.arch }}
+          name: visual-comparison-macos-${{ matrix.arch }}
           path: |
-            tests/visual/snapshots/darwin/processing-*.png
             test-results/
             playwright-report/
-          if-no-files-found: error
+          if-no-files-found: warn
       - name: Build pinned macOS local runtime
         run: |
           set -euo pipefail
           ./scripts/build-local-runtime.sh "${{ matrix.arch }}" 2>&1 | tee runtime-build.log
       - name: Package macOS ${{ matrix.arch }}
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_NAME: ${{ secrets.MAC_CSC_NAME }}
+          MAC_SIGNING_CONFIGURED: ${{ secrets.CSC_LINK != '' && secrets.CSC_KEY_PASSWORD != '' && secrets.MAC_CSC_NAME != '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MAC_NOTARIZATION_CONFIGURED: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' }}
         run: |
           set -euo pipefail
+          echo "MAC_SIGNING_CONFIGURED=$MAC_SIGNING_CONFIGURED" >> "$GITHUB_ENV"
+          echo "MAC_NOTARIZATION_CONFIGURED=$MAC_NOTARIZATION_CONFIGURED" >> "$GITHUB_ENV"
           if [[ "$MAC_SIGNING_CONFIGURED" == true ]]; then
-            unset CSC_NAME
             export CSC_IDENTITY_AUTO_DISCOVERY=true
+            if [[ "$MAC_NOTARIZATION_CONFIGURED" == true ]]; then
+              npm run package:mac:${{ matrix.arch }} -- --config.mac.notarize=true
+            else
+              npm run package:mac:${{ matrix.arch }}
+            fi
           else
+            unset CSC_LINK CSC_KEY_PASSWORD
             export CSC_NAME=-
             export CSC_IDENTITY_AUTO_DISCOVERY=false
-          fi
-          if [[ "$MAC_NOTARIZATION_CONFIGURED" == true && "$MAC_SIGNING_CONFIGURED" == true ]]; then
-            npm run package:mac:${{ matrix.arch }} -- --config.mac.notarize=true
-          else
-            npm run package:mac:${{ matrix.arch }}
+            npm run package:mac:${{ matrix.arch }} -- --config.mac.hardenedRuntime=false --config.mac.notarize=false
           fi
       - name: Verify packaged macOS runtime
         run: |
@@ -132,27 +136,46 @@ jobs:
           set -euo pipefail
           runtime="${{ matrix.app-dir }}/Contents/Resources/local-runtime/darwin-${{ matrix.arch }}"
           file "${{ matrix.app-dir }}/Contents/MacOS/Nnote" "$runtime/whisper-cli" "$runtime/ffmpeg" | tee signature-diagnostics.log
+          expected_arch="${{ matrix.arch }}"
+          [[ "$expected_arch" == x64 ]] && expected_arch=x86_64
+          grep -E "whisper-cli: Mach-O 64-bit executable ${expected_arch}$" signature-diagnostics.log
+          grep -E "ffmpeg: Mach-O 64-bit executable ${expected_arch}$" signature-diagnostics.log
           codesign --verify --deep --strict --verbose=2 "${{ matrix.app-dir }}" 2>&1 | tee -a signature-diagnostics.log
-          codesign -dv --verbose=4 "$runtime/whisper-cli" 2>&1 | tee -a signature-diagnostics.log
-          codesign -dv --verbose=4 "$runtime/ffmpeg" 2>&1 | tee -a signature-diagnostics.log
+          codesign -dv --verbose=4 "${{ matrix.app-dir }}" > app-signature.txt 2>&1
+          codesign -dv --verbose=4 "$runtime/whisper-cli" > whisper-signature.txt 2>&1
+          codesign -dv --verbose=4 "$runtime/ffmpeg" > ffmpeg-signature.txt 2>&1
+          cat app-signature.txt whisper-signature.txt ffmpeg-signature.txt >> signature-diagnostics.log
+          if [[ "$MAC_SIGNING_CONFIGURED" == true ]]; then
+            grep '^Authority=' app-signature.txt
+            grep '^TeamIdentifier=' app-signature.txt
+            diff <(grep '^Authority=' app-signature.txt) <(grep '^Authority=' whisper-signature.txt)
+            diff <(grep '^Authority=' app-signature.txt) <(grep '^Authority=' ffmpeg-signature.txt)
+            diff <(grep '^TeamIdentifier=' app-signature.txt) <(grep '^TeamIdentifier=' whisper-signature.txt)
+            diff <(grep '^TeamIdentifier=' app-signature.txt) <(grep '^TeamIdentifier=' ffmpeg-signature.txt)
+          fi
           if [[ "$MAC_NOTARIZATION_CONFIGURED" == true && "$MAC_SIGNING_CONFIGURED" == true ]]; then
             spctl --assess --type execute --verbose=4 "${{ matrix.app-dir }}" 2>&1 | tee -a signature-diagnostics.log
             echo 'NOTARIZATION VERIFIED' | tee -a signature-diagnostics.log
+          elif [[ "$MAC_SIGNING_CONFIGURED" == true ]]; then
+            echo 'DEVELOPER ID SIGNED; UNNOTARIZED (notarization credentials are incomplete)' | tee -a signature-diagnostics.log
           else
-            echo 'AD-HOC SIGNED; UNNOTARIZED (no repository signing/notarization credentials configured)' | tee -a signature-diagnostics.log
+            echo 'AD-HOC SIGNED; UNNOTARIZED (no complete signing/notarization credentials configured)' | tee -a signature-diagnostics.log
           fi
       - name: Normalize release asset
         run: node scripts/prepare-release-assets.mjs .dmg Nnote-0.0.1-macos-${{ matrix.arch }}.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: diagnostics-macos-${{ matrix.arch }}
           path: |
             runtime-build.log
             package-verification.log
             signature-diagnostics.log
+            app-signature.txt
+            whisper-signature.txt
+            ffmpeg-signature.txt
             build/local-runtime/darwin-${{ matrix.arch }}/runtime-manifest.json
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-macos-${{ matrix.arch }}
           path: release-assets/Nnote-0.0.1-macos-${{ matrix.arch }}.dmg
@@ -162,9 +185,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v0.0.1')
     needs: [windows-x64, macos]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: release-*
           path: release-assets
