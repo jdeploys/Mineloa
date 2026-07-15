@@ -5,6 +5,16 @@ interface TemplateEditorProps {
   templates: TemplatesApi
 }
 
+function templateMutationError(error: unknown, fallback: string): string {
+  if (
+    typeof error === 'object' && error !== null &&
+    (('code' in error && error.code === 'TEMPLATE_IN_USE') ||
+      ('name' in error && error.name === 'TemplateInUseError') ||
+      ('message' in error && typeof error.message === 'string' && /template.+in use/i.test(error.message)))
+  ) return '회의에서 사용 중인 템플릿은 변경할 수 없습니다.'
+  return fallback
+}
+
 export function TemplateEditor({ templates: api }: TemplateEditorProps) {
   const [items, setItems] = useState<SummaryTemplate[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -34,8 +44,8 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
       const updated = await api.update(selected.id, { name })
       setItems((current) => current.map((item) => item.id === updated.id ? updated : item))
       setError(null)
-    } catch {
-      setError('템플릿 이름을 저장하지 못했습니다.')
+    } catch (caught) {
+      setError(templateMutationError(caught, '템플릿 이름을 저장하지 못했습니다.'))
     }
   }
 
@@ -49,8 +59,8 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
       const updated = await api.reorderSections(selected.id, ids)
       setItems((current) => current.map((item) => item.id === updated.id ? updated : item))
       setSections(updated.sections)
-    } catch {
-      setError('섹션 순서를 저장하지 못했습니다.')
+    } catch (caught) {
+      setError(templateMutationError(caught, '섹션 순서를 저장하지 못했습니다.'))
     }
   }
 
@@ -89,8 +99,8 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
       const updated = await api.update(selected.id, { sections })
       setItems((current) => current.map((item) => item.id === updated.id ? updated : item))
       setError(null)
-    } catch {
-      setError('템플릿 섹션을 저장하지 못했습니다.')
+    } catch (caught) {
+      setError(templateMutationError(caught, '템플릿 섹션을 저장하지 못했습니다.'))
     }
   }
 
@@ -117,7 +127,7 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
       <button type="button" onClick={saveName}>이름 저장</button>
       <ol>{sections.map((section, index) => <li key={section.id}>
         <label>섹션 {index + 1} 제목 <input aria-label={`섹션 ${index + 1} 제목`} value={section.title} onChange={(event) => updateSection(index, { title: event.target.value })} /></label>
-        <label>종류 <select aria-label={`섹션 ${index + 1} 종류`} value={section.kind} onChange={(event) => updateSection(index, { kind: event.target.value as TemplateSectionKind })}><option value="paragraph">문단</option><option value="bullet_list">목록</option><option value="action_items">할 일</option></select></label>
+        <label>종류 <select aria-label={`섹션 ${index + 1} 종류`} value={section.kind} onChange={(event) => updateSection(index, { kind: event.target.value as TemplateSectionKind })}><option value="paragraph">문단</option><option value="bullet_list">목록</option><option value="action_items" disabled={sections.some((candidate, position) => position !== index && candidate.kind === 'action_items')}>할 일</option></select></label>
         <label>지시문 <textarea aria-label={`섹션 ${index + 1} 지시문`} value={section.prompt} onChange={(event) => updateSection(index, { prompt: event.target.value })} /></label>
         <button type="button" aria-label="위로 이동" disabled={index === 0} onClick={() => moveSection(index, -1)}>↑</button>
         <button type="button" aria-label="아래로 이동" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)}>↓</button>

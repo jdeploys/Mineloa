@@ -90,6 +90,7 @@ describe('Nnote archive round trip', () => {
     database.prepare('INSERT INTO meetings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run('completed-custom', '완료 회의', now, now, 0, 'completed', 'keep', null, 0, template.id)
 
+    expect(() => service.update(template.id, { sections: [{ ...template.sections[0]!, title: '역사 변경' }] })).toThrow(TemplateInUseError)
     expect(() => service.delete(template.id)).toThrow(TemplateInUseError)
     const exported = await exportMeetingArchive('completed-custom', new MeetingRepository(database), repository, recordings)
 

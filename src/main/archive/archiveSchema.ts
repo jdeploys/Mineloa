@@ -1,7 +1,7 @@
 import { strFromU8, unzipSync } from 'fflate'
 import { z } from 'zod'
 import { AudioPolicySchema } from '../../shared/contracts/meeting'
-import { SummaryTemplateSectionSchema } from '../../shared/contracts/template'
+import { SummaryTemplateSectionsSchema } from '../../shared/contracts/template'
 
 export const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024
 export const MAX_AUDIO_PARTS = 128
@@ -13,7 +13,7 @@ const AUDIO_PART_ENTRY = /^audio\/part-(0|[1-9]\d*)\.webm$/
 
 export const ArchiveTemplateSchema = z.object({
   sourceId: z.string().min(1), name: z.string().min(1).max(200),
-  sections: z.array(SummaryTemplateSectionSchema).min(1).max(8),
+  sections: SummaryTemplateSectionsSchema,
 }).strict()
 export const ArchiveMeetingSchema = z.object({
   title: z.string(), createdAt: z.string().datetime({ offset: true }), updatedAt: z.string().datetime({ offset: true }),

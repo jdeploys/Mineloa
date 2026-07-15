@@ -11,11 +11,23 @@ export const SummaryTemplateSectionSchema = z.object({
 }).strict()
 export type SummaryTemplateSection = z.infer<typeof SummaryTemplateSectionSchema>
 
+export const SummaryTemplateSectionsSchema = z.array(SummaryTemplateSectionSchema).min(1).max(8).superRefine((sections, context) => {
+  if (sections.filter(({ kind }) => kind === 'action_items').length > 1) {
+    context.addIssue({ code: 'custom', message: 'At most one action_items section is allowed' })
+  }
+})
+
+export const CreateTemplateSectionsSchema = z.array(SummaryTemplateSectionSchema.omit({ id: true })).min(1).max(8).superRefine((sections, context) => {
+  if (sections.filter(({ kind }) => kind === 'action_items').length > 1) {
+    context.addIssue({ code: 'custom', message: 'At most one action_items section is allowed' })
+  }
+})
+
 export const SummaryTemplateSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(200),
   isDefault: z.boolean(),
-  sections: z.array(SummaryTemplateSectionSchema).min(1).max(8),
+  sections: SummaryTemplateSectionsSchema,
   createdAt: z.string().datetime({ offset: true }),
   updatedAt: z.string().datetime({ offset: true }),
 }).strict()
@@ -23,13 +35,13 @@ export type SummaryTemplate = z.infer<typeof SummaryTemplateSchema>
 
 export const CreateTemplateInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  sections: z.array(SummaryTemplateSectionSchema.omit({ id: true })).min(1).max(8),
+  sections: CreateTemplateSectionsSchema,
 }).strict()
 export type CreateTemplateInput = z.input<typeof CreateTemplateInputSchema>
 
 export const UpdateTemplateInputSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
-  sections: z.array(SummaryTemplateSectionSchema).min(1).max(8).optional(),
+  sections: SummaryTemplateSectionsSchema.optional(),
 }).strict().refine((value) => value.name !== undefined || value.sections !== undefined, 'No changes supplied')
 export type UpdateTemplateInput = z.input<typeof UpdateTemplateInputSchema>
 

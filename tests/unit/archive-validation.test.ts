@@ -142,6 +142,16 @@ describe('Nnote archive validation', () => {
       title: '회의', createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-07-15T00:00:00.000Z', durationMs: 1,
       status: 'completed', audioPolicy: 'keep', template: { sourceId: 't', name: 't', sections: [{ id: semanticSectionId, title: '요약', kind: 'paragraph', prompt: 'x' }] },
     }))
-    expect(() => parseArchive(zipSync(entries))).toThrow(/action_items/i)
+    expect(() => parseArchive(zipSync(entries))).toThrow(/action[_ ]items?/i)
+  })
+
+  it('rejects an imported template with two action_items sections before persistence', () => {
+    const entries = semanticArchive()
+    const meeting = JSON.parse(new TextDecoder().decode(entries['meeting.json']))
+    meeting.template.sections.push({
+      id: '10000000-0000-4000-8000-000000000011', title: '또 다른 할 일', kind: 'action_items', prompt: 'x',
+    })
+    entries['meeting.json'] = strToU8(JSON.stringify(meeting))
+    expect(() => parseArchive(zipSync(entries))).toThrow(/meeting.*json/i)
   })
 })

@@ -66,6 +66,7 @@ export class TemplateService {
 
   update(id: string, input: UpdateTemplateInput): SummaryTemplate {
     this.assertMutable(id)
+    this.assertNotInUse(id)
     const parsed = UpdateTemplateInputSchema.parse(input)
     const current = this.repository.requireById(id)
     if (parsed.sections !== undefined) {
@@ -82,6 +83,7 @@ export class TemplateService {
 
   reorderSections(id: string, orderedSectionIds: readonly string[]): SummaryTemplate {
     this.assertMutable(id)
+    this.assertNotInUse(id)
     const current = this.repository.requireById(id)
     const unique = new Set(orderedSectionIds)
     if (
@@ -97,8 +99,12 @@ export class TemplateService {
 
   delete(id: string): void {
     this.assertMutable(id)
-    if (this.repository.countMeetingReferences(id) > 0) throw new TemplateInUseError(id)
+    this.assertNotInUse(id)
     this.repository.delete(id)
+  }
+
+  private assertNotInUse(id: string): void {
+    if (this.repository.countMeetingReferences(id) > 0) throw new TemplateInUseError(id)
   }
 
   private assertMutable(id: string): void {

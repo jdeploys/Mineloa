@@ -153,6 +153,59 @@ describe('TemplateService', () => {
     database.close()
   })
 
+  it.each(['recorded', 'completed'] as const)(
+    'rejects every structural update and reorder for a %s meeting while preserving its template and summary',
+    (status) => {
+      const { database, service } = harness()
+      const created = service.create({
+        name: `${status} 역사 템플릿`,
+        sections: [
+          { title: '요약', kind: 'paragraph', prompt: '요약하세요.' },
+          { title: '논의', kind: 'bullet_list', prompt: '논의를 정리하세요.' },
+        ],
+      })
+      const now = '2026-07-15T00:00:00.000Z'
+      const meetingId = `historical-${status}`
+      database.prepare('INSERT INTO meetings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(meetingId, status, now, now, 0, status, 'keep', null, 0, created.id)
+      database.prepare('INSERT INTO summary_sections VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`summary-${status}`, meetingId, created.sections[0]!.id, 'paragraph', JSON.stringify({ text: '보존', items: [] }), 0)
+      const originalTemplate = JSON.stringify(service.get(created.id))
+      const originalSummary = database.prepare('SELECT * FROM summary_sections WHERE meeting_id = ?').all(meetingId)
+
+      const operations = [
+        () => service.update(created.id, { sections: [{ ...created.sections[0]!, title: '변경' }, created.sections[1]!] }),
+        () => service.update(created.id, { sections: [{ ...created.sections[0]!, kind: 'bullet_list' }, created.sections[1]!] }),
+        () => service.update(created.id, { sections: [created.sections[0]!] }),
+        () => service.reorderSections(created.id, created.sections.map(({ id }) => id).reverse()),
+      ]
+      for (const operation of operations) {
+        expect(operation).toThrow(TemplateInUseError)
+        expect(JSON.stringify(service.get(created.id))).toBe(originalTemplate)
+        expect(database.prepare('SELECT * FROM summary_sections WHERE meeting_id = ?').all(meetingId)).toEqual(originalSummary)
+      }
+      database.close()
+    },
+  )
+
+  it('rejects more than one action_items section on create and update before persistence', () => {
+    const { database, service } = harness()
+    const duplicateActions = [
+      { title: '할 일 1', kind: 'action_items' as const, prompt: '첫 번째' },
+      { title: '할 일 2', kind: 'action_items' as const, prompt: '두 번째' },
+    ]
+    expect(() => service.create({ name: '잘못된 템플릿', sections: duplicateActions })).toThrow(/action_items/i)
+    expect(service.list().map(({ name }) => name)).not.toContain('잘못된 템플릿')
+
+    const created = service.create({ name: '정상 템플릿', sections: [duplicateActions[0]!] })
+    const before = service.get(created.id)
+    expect(() => service.update(created.id, {
+      sections: [before.sections[0]!, { ...before.sections[0]!, id: '10000000-0000-4000-8000-000000000099', title: '두 번째' }],
+    })).toThrow(/action_items/i)
+    expect(service.get(created.id)).toEqual(before)
+    database.close()
+  })
+
   it.each(['draft', 'recording', 'recoverable', 'recorded', 'transcribing', 'summarizing', 'completed', 'failed', 'deleted'] as const)(
     'refuses deletion when a %s meeting references the template and preserves the reference',
     (status) => {

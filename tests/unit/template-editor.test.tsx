@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TemplateEditor } from '../../src/renderer/src/features/templates/TemplateEditor'
@@ -59,5 +59,34 @@ describe('TemplateEditor', () => {
     await user.click(screen.getByRole('button', { name: '섹션 저장' }))
     expect(api.update).toHaveBeenCalledWith('custom', { sections: [expect.objectContaining({ title: '결론', kind: 'bullet_list', prompt: '결론을 목록으로 정리하세요.' })] })
     expect(screen.getByRole('button', { name: '섹션 제거' })).toBeDisabled()
+  })
+
+  it('prevents selecting a second action_items section', async () => {
+    const custom = {
+      ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const,
+      sections: [
+        { ...defaultTemplate.sections[0]!, kind: 'action_items' as const },
+        { id: '10000000-0000-4000-8000-000000000002', title: '요약', kind: 'paragraph' as const, prompt: '요약' },
+      ],
+    }
+    const api = { list: vi.fn().mockResolvedValue([custom]), create: vi.fn(), update: vi.fn(), reorderSections: vi.fn(), delete: vi.fn() } satisfies TemplatesApi
+    render(<TemplateEditor templates={api} />)
+    const secondKind = await screen.findByLabelText('섹션 2 종류')
+    expect(within(secondKind).getByRole('option', { name: '할 일' })).toBeDisabled()
+    expect(within(screen.getByLabelText('섹션 1 종류')).getByRole('option', { name: '할 일' })).not.toBeDisabled()
+  })
+
+  it('shows a safe in-use message when a referenced template edit is refused', async () => {
+    const user = userEvent.setup()
+    const custom = { ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const }
+    const inUse = Object.assign(new Error('Template custom is in use by a meeting'), { name: 'TemplateInUseError', code: 'TEMPLATE_IN_USE' })
+    const api = {
+      list: vi.fn().mockResolvedValue([custom]), create: vi.fn(),
+      update: vi.fn().mockRejectedValue(inUse), reorderSections: vi.fn(), delete: vi.fn(),
+    } satisfies TemplatesApi
+    render(<TemplateEditor templates={api} />)
+    await screen.findByLabelText('섹션 1 제목')
+    await user.click(screen.getByRole('button', { name: '섹션 저장' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('회의에서 사용 중인 템플릿은 변경할 수 없습니다.')
   })
 })
