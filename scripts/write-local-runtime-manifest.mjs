@@ -104,7 +104,7 @@ export async function writeRuntimeManifest({ directory, platform, arch, replaceE
     whisperCpp: 'v1.9.1',
     whisperCppCommit: 'f049fff95a089aa9969deb009cdd4892b3e74916',
     ffmpeg: 'n8.1.2',
-    ffmpegCommit: '1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c',
+    ffmpegCommit: '38b88335f99e76ed89ff3c93f877fdefce736c13',
     files,
   }, null, 2)}\n`
   const manifestPath = join(root, 'runtime-manifest.json')

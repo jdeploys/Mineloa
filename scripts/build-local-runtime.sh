@@ -4,7 +4,7 @@ set -euo pipefail
 WHISPER_TAG='v1.9.1'
 FFMPEG_TAG='n8.1.2'
 WHISPER_COMMIT='f049fff95a089aa9969deb009cdd4892b3e74916'
-FFMPEG_COMMIT='1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c'
+FFMPEG_COMMIT='38b88335f99e76ed89ff3c93f877fdefce736c13'
 FFMPEG_FLAGS=(
   --disable-gpl --disable-nonfree --disable-doc --disable-network
   --disable-ffplay --disable-ffprobe --disable-everything --enable-ffmpeg
@@ -35,13 +35,13 @@ trap fail ERR
 
 git -C "$build_root" clone --depth 1 --branch "$WHISPER_TAG" --single-branch https://github.com/ggml-org/whisper.cpp.git whisper.cpp
 [[ "$(git -C "$build_root/whisper.cpp" describe --exact-match --tags HEAD)" == "$WHISPER_TAG" ]]
-[[ "$(git -C "$build_root/whisper.cpp" rev-parse HEAD)" == "$WHISPER_COMMIT" ]]
+[[ "$(git -C "$build_root/whisper.cpp" rev-parse 'HEAD^{commit}')" == "$WHISPER_COMMIT" ]]
 cmake -S "$build_root/whisper.cpp" -B "$build_root/whisper.cpp/build" -DGGML_NATIVE=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON -DBUILD_SHARED_LIBS=OFF
 cmake --build "$build_root/whisper.cpp/build" --config Release --target whisper-cli --parallel
 
 git -C "$build_root" clone --depth 1 --branch "$FFMPEG_TAG" --single-branch https://github.com/FFmpeg/FFmpeg.git ffmpeg
 [[ "$(git -C "$build_root/ffmpeg" describe --exact-match --tags HEAD)" == "$FFMPEG_TAG" ]]
-[[ "$(git -C "$build_root/ffmpeg" rev-parse HEAD)" == "$FFMPEG_COMMIT" ]]
+[[ "$(git -C "$build_root/ffmpeg" rev-parse 'HEAD^{commit}')" == "$FFMPEG_COMMIT" ]]
 (cd "$build_root/ffmpeg" && ./configure "${FFMPEG_FLAGS[@]}" && make -j"$(sysctl -n hw.logicalcpu)" ffmpeg)
 
 cp -- "$build_root/whisper.cpp/build/bin/whisper-cli" "$output/whisper-cli"

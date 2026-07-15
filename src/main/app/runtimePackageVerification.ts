@@ -23,7 +23,7 @@ interface RuntimeManifest {
   whisperCpp: 'v1.9.1'
   whisperCppCommit: 'f049fff95a089aa9969deb009cdd4892b3e74916'
   ffmpeg: 'n8.1.2'
-  ffmpegCommit: '1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c'
+  ffmpegCommit: '38b88335f99e76ed89ff3c93f877fdefce736c13'
   files: Record<string, RuntimeManifestFile>
 }
 
@@ -73,7 +73,7 @@ function isManifest(value: unknown): value is RuntimeManifest {
   if (manifest.schemaVersion !== 1 || manifest.whisperCpp !== 'v1.9.1'
     || manifest.whisperCppCommit !== 'f049fff95a089aa9969deb009cdd4892b3e74916'
     || manifest.ffmpeg !== 'n8.1.2'
-    || manifest.ffmpegCommit !== '1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c') return false
+    || manifest.ffmpegCommit !== '38b88335f99e76ed89ff3c93f877fdefce736c13') return false
   if (typeof manifest.platform !== 'string' || typeof manifest.arch !== 'string') return false
   return typeof manifest.files === 'object' && manifest.files !== null && !Array.isArray(manifest.files)
 }

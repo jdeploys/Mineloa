@@ -46,7 +46,7 @@ async function payload(platform: 'win32' | 'darwin' = 'win32', arch = 'x64', hel
   await writeFile(join(directory, 'runtime-manifest.json'), JSON.stringify({
     schemaVersion: 1, platform, arch,
     whisperCpp: 'v1.9.1', whisperCppCommit: 'f049fff95a089aa9969deb009cdd4892b3e74916',
-    ffmpeg: 'n8.1.2', ffmpegCommit: '1c2c67c0b9f7f66ab32c19dcf7f227bcd290aa4c', files: entries,
+    ffmpeg: 'n8.1.2', ffmpegCommit: '38b88335f99e76ed89ff3c93f877fdefce736c13', files: entries,
   }))
   return { resourcesPath, directory, names }
 }
