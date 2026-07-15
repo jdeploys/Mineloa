@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parsePackageVerificationRequest } from '../../src/main/app/packageVerification'
@@ -39,5 +39,22 @@ describe('release package configuration', () => {
       '!**/*.sqlite',
       '!**/.env*',
     ]))
+  })
+
+  it('defines the exact 0.0.1 cross-platform prerelease contract', () => {
+    expect(manifest.version).toBe('0.0.1')
+    expect(manifest.scripts).toMatchObject({
+      'package:win:x64': expect.stringContaining('--x64'),
+      'package:mac:x64': expect.stringContaining('--x64'),
+      'package:mac:arm64': expect.stringContaining('--arm64'),
+    })
+    const workflowPath = resolve('.github/workflows/release.yml')
+    expect(existsSync(workflowPath)).toBe(true)
+    if (!existsSync(workflowPath)) return
+    const workflow = readFileSync(workflowPath, 'utf8')
+    expect(workflow).toContain('v0.0.1')
+    expect(workflow).toContain('contents: write')
+    expect(workflow).toContain('--prerelease')
+    expect(workflow).toContain('scripts/verify-package.mjs')
   })
 })

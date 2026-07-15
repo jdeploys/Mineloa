@@ -1,6 +1,6 @@
 {
   "name": "nnote",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Secure desktop meeting recorder",
   "main": "out/main/index.js",
@@ -18,6 +18,9 @@
     "lint": "eslint . --max-warnings=0",
     "package:win": "npm run build && npm run rebuild:electron && electron-builder --win --publish never",
     "package:mac": "npm run build && npm run rebuild:electron && electron-builder --mac --publish never",
+    "package:win:x64": "npm run build && electron-builder --win nsis dir --x64 --publish never",
+    "package:mac:x64": "npm run build && electron-builder --mac dmg dir --x64 --publish never",
+    "package:mac:arm64": "npm run build && electron-builder --mac dmg dir --arm64 --publish never",
     "verify:win": "node scripts/verify-package.mjs dist/win-unpacked"
   },
   "build": {
@@ -54,6 +57,7 @@
       "output": "dist",
       "buildResources": "build"
     },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "win": {
       "icon": "build/icons/icon.ico",
       "target": [

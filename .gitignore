@@ -3,5 +3,6 @@
 node_modules/
 out/
 dist/
+release-assets/
 test-results/
 playwright-report/
