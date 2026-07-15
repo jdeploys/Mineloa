@@ -13,6 +13,7 @@ import {
 import { RecoveryDialog } from './features/recording/RecoveryDialog'
 import { RecordingPanel } from './features/recording/RecordingPanel'
 import { ApiKeySettings } from './features/settings/ApiKeySettings'
+import { ProcessingProviderSettings } from './features/settings/ProcessingProviderSettings'
 import { TemplateEditor } from './features/templates/TemplateEditor'
 
 type Screen = 'all' | 'templates' | 'settings' | 'detail'
@@ -210,6 +211,7 @@ export function App({
       <button className="back-button" onClick={backToAll}>← 전체 기록</button>
       <h1 ref={routeHeading} tabIndex={-1}>설정</h1>
       <ApiKeySettings settings={desktopApi.settings} />
+      <ProcessingProviderSettings settings={desktopApi.settings} />
     </main>}
     {screen === 'templates' && <main className="document-shell template-page">
       <button className="back-button" onClick={backToAll}>← 전체 기록</button>

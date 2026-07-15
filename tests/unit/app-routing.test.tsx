@@ -22,7 +22,13 @@ function api(overrides: Partial<DesktopApi['meetings']> = {}): DesktopApi {
       renameSpeaker: vi.fn(),
       ...overrides,
     } as DesktopApi['meetings'],
-    settings: { getApiKeyStatus: vi.fn(async () => ({ configured: false, lastValidatedAt: null })), saveApiKey: vi.fn(), deleteApiKey: vi.fn() },
+    settings: {
+      getApiKeyStatus: vi.fn(async () => ({ configured: false, lastValidatedAt: null })), saveApiKey: vi.fn(), deleteApiKey: vi.fn(),
+      getProcessingProviders: vi.fn(async () => ({ transcriptionProvider: 'openai', summaryProvider: 'openai', localWhisperModel: 'base' })),
+      updateProcessingProviders: vi.fn(async (input) => input),
+      listProcessingProviderDescriptors: vi.fn(async () => []), listWhisperModels: vi.fn(async () => []),
+      downloadWhisperModel: vi.fn(), deleteWhisperModel: vi.fn(), onWhisperModelProgress: vi.fn(() => () => undefined),
+    },
     templates: { list: vi.fn(async () => [{ id: 'default', name: '기본', isDefault: true, sections: [{ id: '10000000-0000-4000-8000-000000000001', title: '요약', kind: 'paragraph', prompt: '요약' }], createdAt: now, updatedAt: now }]), create: vi.fn(), update: vi.fn(), reorderSections: vi.fn(), delete: vi.fn() },
     recording: {
       start: vi.fn(), cancelStart: vi.fn(async () => undefined), appendChunk: vi.fn(), pause: vi.fn(),
