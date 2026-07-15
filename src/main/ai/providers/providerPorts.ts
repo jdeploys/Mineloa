@@ -18,7 +18,10 @@ export interface ProviderDescriptor {
   capabilities: readonly ('api_key' | 'model_manager' | 'cli_status' | 'speaker_diarization')[]
 }
 
-export interface TranscriptionProviderRequest { filePath: string }
+export interface TranscriptionProviderRequest {
+  filePath: string
+  recordingDurationSeconds?: number
+}
 
 export interface NormalizedTranscriptSegment {
   speakerLabel: string | null

@@ -34,6 +34,8 @@ import { CodexCliSummaryAdapter } from './ai/providers/codexCliSummaryAdapter'
 import { runOwnedProcess } from './process/runOwnedProcess'
 import { WhisperModelManager } from './localModels/whisperModelManager'
 import { publishWhisperProgressToLiveWindows } from './window/publishWhisperProgress'
+import { LocalWhisperTranscriptionAdapter } from './ai/providers/localWhisperTranscriptionAdapter'
+import { resolveLocalRuntimePaths } from './localRuntime/runtimePaths'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'nnote-media',
@@ -58,7 +60,23 @@ if (verificationRequest !== null) {
         const processingSettings = new ProcessingSettingsRepository(database)
         const whisperModels = new WhisperModelManager(join(userDataDirectory, 'models', 'whisper'))
         const registry = new ProviderRegistry(
-          [new OpenAiTranscriptionAdapter(new OpenAiGateway(credentialStore))],
+          [
+            new OpenAiTranscriptionAdapter(new OpenAiGateway(credentialStore)),
+            new LocalWhisperTranscriptionAdapter({
+              resolveRuntimePaths: () => resolveLocalRuntimePaths({
+                isPackaged: app.isPackaged,
+                resourcesPath: process.resourcesPath,
+                platform: process.platform,
+                arch: process.arch,
+                developmentRuntimeDirectory: process.env.NNOTE_LOCAL_RUNTIME_DIR,
+              }),
+              verifiedModelPath: (model) => whisperModels.verifiedPath(model),
+              resolveModel: () => processingSettings.get().localWhisperModel,
+              recordingsRoot: recordingsDirectory,
+              temporaryRoot: app.getPath('temp'),
+              runProcess: runOwnedProcess,
+            }),
+          ],
           [
             new OpenAiSummaryAdapter(new OpenAiSummaryGateway(credentialStore)),
             new CodexCliSummaryAdapter(runOwnedProcess, app.getPath('temp')),

@@ -64,14 +64,17 @@ export class TranscriptionService {
         }
       }
       const provider = this.resolveProvider()
-      const paths = await this.finalizedPartPaths(meetingId)
+      const parts = await this.finalizedParts(meetingId)
       const speakers = new Map<string, Speaker>()
       const segments: TranscriptSegment[] = []
       let offsetSeconds = 0
       const meetingPrefix = createHash('sha256').update(meetingId, 'utf8').digest('hex')
 
-      for (const [partIndex, filePath] of paths.entries()) {
-        const response = await provider.transcribe({ filePath })
+      for (const [partIndex, part] of parts.entries()) {
+        const response = await provider.transcribe({
+          filePath: part.filePath,
+          ...(part.durationSeconds === undefined ? {} : { recordingDurationSeconds: part.durationSeconds }),
+        })
         validateProviderTiming(response)
         response.segments.forEach((segment, segmentIndex) => {
           const providerSpeaker = segment.speakerLabel === null
@@ -125,18 +128,24 @@ export class TranscriptionService {
     }
   }
 
-  private async finalizedPartPaths(meetingId: string): Promise<string[]> {
+  private async finalizedParts(meetingId: string): Promise<Array<{ filePath: string; durationSeconds?: number }>> {
     const resolvedRoot = await realpath(this.recordingsDirectory)
     const meeting = this.meetings.requireById(meetingId)
     const durable = this.meetings.listRecordingParts(meetingId)
-    const parts = durable.length > 0
-      ? durable.map((part) => ({ name: part.relativePath, index: part.partIndex }))
+    let previousDurationMs = 0
+    const parts: Array<{ name: string; index: number; durationSeconds?: number }> = durable.length > 0
+      ? durable.map((part): { name: string; index: number; durationSeconds: number } => {
+          const durationMs = part.durationMs - previousDurationMs
+          previousDurationMs = part.durationMs
+          return { name: part.relativePath, index: part.partIndex, durationSeconds: durationMs / 1_000 }
+        })
       : meeting.audioPath === null ? [] : [{ name: meeting.audioPath, index: 0 }]
-    if (parts.length === 0 || parts.some((part, index) => part.index !== index || basename(part.name) !== part.name)) {
+    if (parts.length === 0 || parts.some((part, index) => part.index !== index || basename(part.name) !== part.name
+      || (part.durationSeconds !== undefined && (!Number.isFinite(part.durationSeconds) || part.durationSeconds < 0)))) {
       throw safeProviderError('OPENAI_INVALID_AUDIO', 'OpenAI could not process this audio file.', false)
     }
     return Promise.all(
-      parts.map(async ({ name }) => {
+      parts.map(async ({ name, ...part }) => {
         const candidate = join(this.recordingsDirectory, name)
         const details = await lstat(candidate)
         if (details.isSymbolicLink() || !details.isFile()) {
@@ -147,7 +156,7 @@ export class TranscriptionService {
         if (fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot)) {
           throw safeProviderError('OPENAI_INVALID_AUDIO', 'OpenAI could not process this audio file.', false)
         }
-        return resolved
+        return { filePath: resolved, ...part }
       }),
     )
   }

@@ -55,7 +55,7 @@ describe('OpenAiGateway', () => {
     }
     const adapter = new OpenAiTranscriptionAdapter(gateway)
 
-    await expect(adapter.transcribe({ filePath: 'meeting.webm' })).resolves.toEqual({
+    await expect(adapter.transcribe({ filePath: 'meeting.webm', recordingDurationSeconds: 99 })).resolves.toEqual({
       durationSeconds: 1,
       segments: [{ speakerLabel: 'A', startSeconds: 0, endSeconds: 1, text: 'Hello' }],
     })
@@ -244,7 +244,7 @@ describe('TranscriptionService', () => {
       { partIndex: 0, relativePath: basename(first), byteCount: 3, durationMs: 6_000 },
       { partIndex: 1, relativePath: basename(second), byteCount: 3, durationMs: 12_000 },
     ])
-    const requests: Array<{ filePath: string }> = []
+    const requests: Array<{ filePath: string; recordingDurationSeconds?: number }> = []
     const gateway = {
       async transcribe(request: (typeof requests)[number]) {
         requests.push(request)
@@ -260,7 +260,10 @@ describe('TranscriptionService', () => {
 
     expect(requests.map(({ filePath }) => filePath)).toEqual([await realpath(first), await realpath(second)])
     expect(resolveProvider).toHaveBeenCalledTimes(1)
-    expect(requests[0]).toEqual({ filePath: await realpath(first) })
+    expect(requests).toEqual([
+      { filePath: await realpath(first), recordingDurationSeconds: 6 },
+      { filePath: await realpath(second), recordingDurationSeconds: 6 },
+    ])
     expect(result.speakers).toEqual([
       { id: `${meetingPrefix}:0:A`, meetingId: 'meeting-1', displayName: 'Speaker A' },
       { id: `${meetingPrefix}:1:A`, meetingId: 'meeting-1', displayName: 'Speaker A' },
@@ -455,6 +458,36 @@ describe('TranscriptionService', () => {
       endMs: 1_000,
       text: 'Unattributed',
     }])
+    h.database.close()
+  })
+
+  it('offsets local null-speaker parts by durable full-part durations including trailing silence', async () => {
+    const h = harness()
+    const first = completedPartPath(h.recordingsDirectory, 'meeting-1', 0)
+    const second = completedPartPath(h.recordingsDirectory, 'meeting-1', 1)
+    writeFileSync(first, Buffer.from([1]))
+    writeFileSync(second, Buffer.from([2]))
+    h.meetings.replaceRecordingParts('meeting-1', [
+      { partIndex: 0, relativePath: basename(first), byteCount: 1, durationMs: 4_000 },
+      { partIndex: 1, relativePath: basename(second), byteCount: 1, durationMs: 10_000 },
+    ])
+    const provider = {
+      async transcribe(request: { filePath: string; recordingDurationSeconds?: number }) {
+        return {
+          durationSeconds: request.recordingDurationSeconds!,
+          segments: [{ speakerLabel: null, startSeconds: 0, endSeconds: 1, text: basename(request.filePath) }],
+        }
+      },
+    }
+
+    const result = await new TranscriptionService(
+      h.meetings, () => provider, h.recordingsDirectory,
+    ).transcribeMeeting('meeting-1')
+
+    expect(result.segments.map(({ startMs, endMs }) => ({ startMs, endMs }))).toEqual([
+      { startMs: 0, endMs: 1_000 },
+      { startMs: 4_000, endMs: 5_000 },
+    ])
     h.database.close()
   })
 })
