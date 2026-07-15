@@ -29,8 +29,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - name: Build pinned Windows local runtime
-        shell: msys2 {0}
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-local-runtime.ps1 -Arch x64 2>&1 | tee runtime-build.log
+        shell: pwsh
+        run: ./scripts/build-local-runtime.ps1 -Arch x64 -FfmpegShell msys2 *>&1 | Tee-Object runtime-build.log
       - name: Package unsigned Windows x64
         run: npm run package:win:x64
         env:

@@ -33,4 +33,12 @@ describe('local runtime build contract', () => {
     expect(notices).toContain('LGPL')
     expect(notices).not.toMatch(/ggml-(?:base|small)\.bin/)
   })
+
+  it('keeps Windows native build tools separate from the explicit MSYS2 FFmpeg bridge', () => {
+    const script = readFileSync(resolve('scripts/build-local-runtime.ps1'), 'utf8')
+    expect(script).toContain("[ValidateSet('bash', 'msys2')]")
+    expect(script).toContain("$FfmpegShellArguments = if ($FfmpegShell -eq 'msys2')")
+    expect(script).toContain("@('-c', $ConfigureCommand)")
+    expect(script).toContain("@('-lc', $ConfigureCommand)")
+  })
 })

@@ -36,8 +36,8 @@ jobs:
       - run: npm run test:e2e
       - name: Build pinned Windows local runtime
         if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-local-runtime.ps1 -Arch x64
+        shell: pwsh
+        run: ./scripts/build-local-runtime.ps1 -Arch x64 -FfmpegShell msys2
       - name: Package and verify Windows (unsigned)
         if: runner.os == 'Windows'
         shell: pwsh

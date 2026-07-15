@@ -90,12 +90,12 @@ describe('release package configuration', () => {
     expect(release).toContain('bash ./scripts/build-local-runtime.sh "${{ matrix.arch }}"')
   })
 
-  it('builds the Windows FFmpeg runtime inside the MSYS2 shell while keeping packaging in its native step', () => {
+  it('keeps Windows orchestration native and bridges only FFmpeg commands through MSYS2', () => {
     const ci = readFileSync(resolve('.github/workflows/ci.yml'), 'utf8')
     const release = readFileSync(resolve('.github/workflows/release.yml'), 'utf8')
     for (const workflow of [ci, release]) {
-      expect(workflow).toContain('shell: msys2 {0}')
-      expect(workflow).toContain('powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-local-runtime.ps1 -Arch x64')
+      expect(workflow).toContain('shell: pwsh')
+      expect(workflow).toContain('./scripts/build-local-runtime.ps1 -Arch x64 -FfmpegShell msys2')
       expect(workflow).toContain('npm run package:win:x64')
     }
   })

@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('x64')][string]$Arch = 'x64'
+  [ValidateSet('x64')][string]$Arch = 'x64',
+  [ValidateSet('bash', 'msys2')][string]$FfmpegShell = 'bash'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,11 +50,19 @@ try {
   Invoke-Checked 'git' @('describe', '--exact-match', '--tags', 'HEAD') (Join-Path $BuildRoot 'ffmpeg')
   $ResolvedFfmpegCommit = (& git -C (Join-Path $BuildRoot 'ffmpeg') rev-parse 'HEAD^{commit}').Trim()
   if ($LASTEXITCODE -ne 0 -or $ResolvedFfmpegCommit -ne $FfmpegCommit) { throw 'FFmpeg source commit mismatch' }
-  $Bash = if ($env:FFMPEG_BASH) { $env:FFMPEG_BASH } else { (Get-Command bash -ErrorAction Stop).Source }
+  $FfmpegShellProgram = if ($FfmpegShell -eq 'msys2') {
+    (Get-Command msys2 -ErrorAction Stop).Source
+  } elseif ($env:FFMPEG_BASH) {
+    $env:FFMPEG_BASH
+  } else {
+    (Get-Command bash -ErrorAction Stop).Source
+  }
   $env:CHERE_INVOKING = '1'
   $ConfigureCommand = './configure ' + ($FfmpegFlags -join ' ')
-  Invoke-Checked $Bash @('-lc', $ConfigureCommand) (Join-Path $BuildRoot 'ffmpeg')
-  Invoke-Checked $Bash @('-lc', 'make -j2 ffmpeg') (Join-Path $BuildRoot 'ffmpeg')
+  $FfmpegShellArguments = if ($FfmpegShell -eq 'msys2') { @('-c', $ConfigureCommand) } else { @('-lc', $ConfigureCommand) }
+  $MakeShellArguments = if ($FfmpegShell -eq 'msys2') { @('-c', 'make -j2 ffmpeg') } else { @('-lc', 'make -j2 ffmpeg') }
+  Invoke-Checked $FfmpegShellProgram $FfmpegShellArguments (Join-Path $BuildRoot 'ffmpeg')
+  Invoke-Checked $FfmpegShellProgram $MakeShellArguments (Join-Path $BuildRoot 'ffmpeg')
 
   $WhisperBinary = @(
     (Join-Path $BuildRoot 'whisper.cpp\build\bin\Release\whisper-cli.exe'),
