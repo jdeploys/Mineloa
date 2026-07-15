@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -143,7 +144,7 @@ describe('ProcessingService', () => {
 
   it('deletes canonical macOS-safe non-primary paths first and preserves coherent primary metadata when primary deletion fails', async () => {
     const h = harness({ policy: 'delete_after_processing' })
-    const expectedRemoves = [realpathSync(h.second), realpathSync(h.first)]
+    const expectedRemoves = [await realpath(h.second), await realpath(h.first)]
     const removes: string[] = []
     const service = new ProcessingService(h.meetings, { transcribeMeeting: h.transcribe }, { summarizeMeeting: h.summarize }, join(h.first, '..'), {
       remove: async (path) => {

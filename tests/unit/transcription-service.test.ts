@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -233,7 +234,7 @@ describe('TranscriptionService', () => {
     const result = await new TranscriptionService(h.meetings, gateway, h.recordingsDirectory).transcribeMeeting('meeting-1')
     const meetingPrefix = createHash('sha256').update('meeting-1').digest('hex')
 
-    expect(requests.map(({ filePath }) => filePath)).toEqual([realpathSync(first), realpathSync(second)])
+    expect(requests.map(({ filePath }) => filePath)).toEqual([await realpath(first), await realpath(second)])
     expect(requests[0]).toMatchObject({
       model: 'gpt-4o-transcribe-diarize',
       responseFormat: 'diarized_json',
