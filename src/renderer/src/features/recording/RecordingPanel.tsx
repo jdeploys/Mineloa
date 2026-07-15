@@ -133,7 +133,7 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
         <>
           {templates !== undefined && <label>요약 템플릿 <select aria-label="요약 템플릿" value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>{templateItems.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>}
           <label>원본 오디오 <select aria-label="원본 오디오" value={audioPolicy} onChange={(event) => setAudioPolicy(event.target.value as AudioPolicy)}><option value="delete_after_processing">처리 후 삭제</option><option value="keep">계속 보관</option></select></label>
-          <button disabled={busy || (templates !== undefined && templateItems.length === 0)} onClick={() => void start()}>
+          <button className="button-primary" disabled={busy || (templates !== undefined && templateItems.length === 0)} onClick={() => void start()}>
             녹음 시작
           </button>
         </>
@@ -150,10 +150,10 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
           <p>{snapshot.localSave === 'saving' ? '로컬 저장 중' : snapshot.localSave === 'saved' ? '로컬 저장 완료' : '로컬 저장 대기'}</p>
           {snapshot.warn && <p role="status">22 MiB를 넘어 새 파트 전환을 준비합니다.</p>}
           {controls.pause !== undefined && controls.resume !== undefined && <button disabled={busy} onClick={() => void togglePause()}>{snapshot.phase === 'paused' ? '재개' : '일시정지'}</button>}
-          <button disabled={busy} onClick={() => void stop()}>
+          <button className="button-primary" disabled={busy} onClick={() => void stop()}>
             종료
           </button>
-          <button disabled={busy} onClick={() => setConfirmingDiscard(true)}>
+          <button className="button-danger" disabled={busy} onClick={() => setConfirmingDiscard(true)}>
             폐기
           </button>
         </>

@@ -65,11 +65,11 @@ export function RecoveryDialog({ items, recovery, onResolved, onRecover, recover
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="중단된 녹음 복구">
+    <div className="recovery-panel" role="dialog" aria-modal="true" aria-label="중단된 녹음 복구">
       <h1>중단된 녹음 복구</h1>
       <p>모든 항목을 처리할 때까지 새 녹음을 시작할 수 없습니다.</p>
       {items.map((item) => (
-        <section key={item.meetingId} aria-label={`중단된 녹음 ${item.meetingId}`}>
+        <section className="recovery-item" key={item.meetingId} aria-label={`중단된 녹음 ${item.meetingId}`}>
           <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
           <span>{formatDuration(item.durationMs)}</span>
           <span>{formatBytes(item.byteCount)}</span>

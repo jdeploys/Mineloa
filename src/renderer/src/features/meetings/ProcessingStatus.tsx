@@ -51,7 +51,7 @@ export function ProcessingStatus({ meetingId, processing, initialStatus, onStatu
     }
   }
 
-  return <section aria-label="AI 처리 상태">
+  return <section className="processing-panel" aria-label="AI 처리 상태">
     <p>{label}</p>
     <p>{status.audioRequired ? '원본 오디오 필요' : '원본 오디오 불필요'}</p>
     {status.error && <p>{status.error.message}</p>}

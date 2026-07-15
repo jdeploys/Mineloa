@@ -25,10 +25,10 @@ describe('balanced meeting dashboard', () => {
       onNavigate={vi.fn()}
     />)
 
-    expect(screen.getByRole('button', { name: '녹음 시작' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '녹음 시작' })).toHaveClass('button-primary')
     expect(screen.getByText('completed')).toBeInTheDocument()
     expect(screen.getByText('failed')).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: '주요 메뉴' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: '주요 메뉴' })).toHaveClass('app-nav')
   })
 
   it('opens a meeting row without starting or discarding a recording', async () => {

@@ -26,6 +26,7 @@ describe('RecoveryDialog', () => {
     render(<RecoveryDialog items={[item]} recovery={recovery} onResolved={resolved} />)
 
     expect(screen.getByRole('dialog', { name: '중단된 녹음 복구' })).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByRole('dialog', { name: '중단된 녹음 복구' })).toHaveClass('recovery-panel')
     expect(screen.getByText('1분 5초')).toBeInTheDocument()
     expect(screen.getByText('1 KB')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '복구' }))
