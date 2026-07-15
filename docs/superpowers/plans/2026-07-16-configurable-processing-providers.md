@@ -76,7 +76,7 @@ export const ProcessingProviderSettingsSchema = z.object({
 export type ProcessingProviderSettings = z.infer<typeof ProcessingProviderSettingsSchema>
 ```
 
-Migration 3 creates `app_settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL)` and inserts `processing_providers` with `{"transcriptionProvider":"openai","summaryProvider":"openai"}` using `INSERT OR IGNORE`, then sets `PRAGMA user_version = 3` in the existing transactional migration style.
+Migration 3 creates `app_settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL)` and inserts `processing_providers` with `{"transcriptionProvider":"openai","summaryProvider":"openai","localWhisperModel":"base"}` using `INSERT OR IGNORE`, then sets `PRAGMA user_version = 3` in the existing transactional migration style.
 
 - [ ] **Step 3: Implement the focused repository and IPC/preload methods**
 
