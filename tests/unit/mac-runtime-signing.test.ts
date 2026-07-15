@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -26,20 +27,30 @@ async function fixture() {
   return { appOutDir, runtime }
 }
 
-const context = (appOutDir: string) => ({
+const context = (appOutDir: string, codeSigningInfo?: { value: Promise<{ keychainFile?: string | null }> }) => ({
   electronPlatformName: 'darwin', appOutDir,
-  packager: { appInfo: { productFilename: 'Nnote' } },
+  packager: { appInfo: { productFilename: 'Nnote' }, ...(codeSigningInfo && { codeSigningInfo }) },
 })
 
 describe('macOS local runtime signing order', () => {
   it('signs both helpers before atomically refreshing hashes from final bytes', async () => {
     const target = await fixture()
     const order: string[] = []
+    const calls: string[][] = []
+    const signingInfo = {
+      value: Promise.resolve().then(() => {
+        order.push('codeSigningInfo')
+        return { keychainFile: '/private/tmp/nnote-signing.keychain' }
+      }),
+    }
     const hook = createAfterPackHook({
-      sign: async (_identity, helper) => {
+      run: (_command, args) => {
+        calls.push(args)
+        const helper = args.at(-1)!
         const name = helper.endsWith('whisper-cli') ? 'whisper-cli' : 'ffmpeg'
         order.push(`sign:${name}`)
-        await writeFile(helper, `${name}-signed-final`, { mode: 0o755 })
+        writeFileSync(helper, `${name}-signed-final`, { mode: 0o755 })
+        return { status: 0, error: undefined }
       },
       writeManifest: async (options) => {
         order.push('manifest')
@@ -48,9 +59,15 @@ describe('macOS local runtime signing order', () => {
       identity: () => 'Developer ID Application: Example',
     })
 
-    await hook(context(target.appOutDir))
+    await hook(context(target.appOutDir, signingInfo))
 
-    expect(order).toEqual(['sign:whisper-cli', 'sign:ffmpeg', 'manifest'])
+    expect(order).toEqual(['codeSigningInfo', 'sign:whisper-cli', 'sign:ffmpeg', 'manifest'])
+    for (const args of calls) {
+      expect(args).toEqual(expect.arrayContaining([
+        '--keychain', '/private/tmp/nnote-signing.keychain',
+        '--sign', 'Developer ID Application: Example',
+      ]))
+    }
     const manifest = JSON.parse(await readFile(join(target.runtime, 'runtime-manifest.json'), 'utf8'))
     for (const name of ['whisper-cli', 'ffmpeg']) {
       const bytes = await readFile(join(target.runtime, name))
@@ -58,6 +75,34 @@ describe('macOS local runtime signing order', () => {
         size: bytes.length,
         sha256: createHash('sha256').update(bytes).digest('hex'),
       })
+    }
+  })
+
+  it('ad-hoc helper signing never resolves the Developer ID keychain', async () => {
+    const target = await fixture()
+    let signingInfoReads = 0
+    const codeSigningInfo = {
+      get value() {
+        signingInfoReads += 1
+        return Promise.reject(new Error('Developer ID keychain must stay lazy'))
+      },
+    }
+    const calls: string[][] = []
+    const hook = createAfterPackHook({
+      run: (_command, args) => {
+        calls.push(args)
+        return { status: 0, error: undefined }
+      },
+      identity: () => '-',
+    })
+
+    await hook(context(target.appOutDir, codeSigningInfo))
+
+    expect(signingInfoReads).toBe(0)
+    expect(calls).toHaveLength(2)
+    for (const args of calls) {
+      expect(args).not.toContain('--keychain')
+      expect(args).toEqual(expect.arrayContaining(['--sign', '-']))
     }
   })
 

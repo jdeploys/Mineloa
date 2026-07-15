@@ -3,11 +3,14 @@ import type { RuntimeManifestWriteOptions } from './write-local-runtime-manifest
 interface AfterPackContext {
   electronPlatformName: string
   appOutDir: string
-  packager: { appInfo: { productFilename: string } }
+  packager: {
+    appInfo: { productFilename: string }
+    codeSigningInfo?: { value: Promise<{ keychainFile?: string | null }> }
+  }
 }
 
 interface AfterPackDependencies {
-  sign?(identity: string, helper: string): Promise<void> | void
+  run?(command: string, args: string[]): { status: number | null, error?: Error }
   writeManifest?(options: RuntimeManifestWriteOptions): Promise<void>
   identity?(): string
 }
