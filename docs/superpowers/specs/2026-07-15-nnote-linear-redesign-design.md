@@ -179,6 +179,43 @@ docs/screenshots/after-linear/
 - viewport checks at 1280×900 and 640×900
 - final diff review limited to Renderer, visual tests, DESIGN.md and screenshot documentation
 
+## GitHub release 0.0.1
+
+리디자인과 After 스크린샷 검증이 끝난 동일 커밋을 첫 공개 배포 버전으로 사용한다.
+
+- `package.json`과 lockfile 버전: `0.0.1`
+- Git tag: `v0.0.1`
+- GitHub repository: `jdeploys/NNote`
+- GitHub Release title: `Nnote 0.0.1`
+- 공개 상태: prerelease
+
+릴리스 자산은 target OS의 GitHub-hosted runner에서 생성한다. native module을 다른 운영체제에서 교차 컴파일한 결과는 사용하지 않는다.
+
+```text
+Nnote-0.0.1-windows-x64.exe
+Nnote-0.0.1-macos-x64.dmg
+Nnote-0.0.1-macos-arm64.dmg
+SHA256SUMS.txt
+```
+
+Windows job은 `windows-latest`에서 x64 NSIS installer를 만들고 unpacked 실행 파일의 Main, SQLite, keyring, Preload와 Renderer 로딩 신호를 검사한다.
+
+macOS job은 macOS runner matrix에서 x64와 arm64 DMG를 각각 만든다. 각 architecture의 unpacked `.app`을 실행해 같은 runtime signal을 검사한다. macOS native module의 architecture가 대상과 일치하는지도 확인한다.
+
+릴리스 workflow는 다음 순서로 동작한다.
+
+1. lint, typecheck, unit/integration tests와 platform visual tests
+2. target별 package build
+3. unpacked runtime verification
+4. 설치 자산과 SHA-256 checksum 수집
+5. draft release에 자산 업로드
+6. 모든 자산 이름, checksum과 runtime signal 확인
+7. prerelease `v0.0.1` 공개
+
+현재 저장소에는 Windows signing certificate 또는 Apple Developer signing/notarization secret이 없다. 따라서 `0.0.1` release note에 Windows SmartScreen과 macOS Gatekeeper 경고 가능성을 명시하고, signed/notarized라고 주장하지 않는다. signing secret이 나중에 제공되면 별도 릴리스 설계로 추가한다.
+
+Git tag와 공개 Release 생성은 모든 로컬·CI 검증이 끝난 뒤 한 번만 수행한다. 일부 platform build가 실패하면 불완전한 공개 Release를 만들지 않는다.
+
 ## Non-goals
 
 - Linear logo, proprietary font or copyrighted product assets 사용
@@ -186,3 +223,4 @@ docs/screenshots/after-linear/
 - light theme와 theme switcher
 - animation-heavy interactions
 - Main/Preload/IPC refactor
+- 이번 버전의 Authenticode signing, Apple code signing 또는 notarization
