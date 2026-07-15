@@ -110,6 +110,20 @@ describe('release package configuration', () => {
     expect(script).not.toContain('--disable-x86asm')
   })
 
+  it('installs NASM for the Intel macOS release runtime and accepts padded file output', () => {
+    const workflow = readFileSync(resolve('.github/workflows/release.yml'), 'utf8')
+    expect(workflow).toContain('if [[ "${{ matrix.arch }}" == x64 ]]; then')
+    expect(workflow).toContain('brew install nasm')
+    expect(workflow).toContain('whisper-cli:[[:space:]]+Mach-O 64-bit executable ${expected_arch}$')
+    expect(workflow).toContain('ffmpeg:[[:space:]]+Mach-O 64-bit executable ${expected_arch}$')
+  })
+
+  it('keeps Apple Silicon NASM setup conditional and Windows runtime setup unchanged', () => {
+    const workflow = readFileSync(resolve('.github/workflows/release.yml'), 'utf8').replace(/\r\n/g, '\n')
+    expect(workflow).toMatch(/if \[\[ "\$\{\{ matrix\.arch \}\}" == x64 \]\]; then\n\s+brew install nasm\n\s+fi/)
+    expect(workflow).toContain('./scripts/build-local-runtime.ps1 -Arch x64 -FfmpegShell msys2')
+  })
+
   it('pins actions, limits permissions, and keeps secrets in the mac package step', () => {
     const workflow = readFileSync(resolve('.github/workflows/release.yml'), 'utf8').replace(/\r\n/g, '\n')
     expect(workflow).toContain('permissions:\n  contents: read')

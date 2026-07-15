@@ -96,6 +96,9 @@ jobs:
       - name: Build pinned macOS local runtime
         run: |
           set -euo pipefail
+          if [[ "${{ matrix.arch }}" == x64 ]]; then
+            brew install nasm
+          fi
           bash ./scripts/build-local-runtime.sh "${{ matrix.arch }}" 2>&1 | tee runtime-build.log
       - name: Package macOS ${{ matrix.arch }}
         env:
@@ -136,8 +139,8 @@ jobs:
           file "${{ matrix.app-dir }}/Contents/MacOS/Nnote" "$runtime/whisper-cli" "$runtime/ffmpeg" | tee signature-diagnostics.log
           expected_arch="${{ matrix.arch }}"
           [[ "$expected_arch" == x64 ]] && expected_arch=x86_64
-          grep -E "whisper-cli: Mach-O 64-bit executable ${expected_arch}$" signature-diagnostics.log
-          grep -E "ffmpeg: Mach-O 64-bit executable ${expected_arch}$" signature-diagnostics.log
+          grep -E "whisper-cli:[[:space:]]+Mach-O 64-bit executable ${expected_arch}$" signature-diagnostics.log
+          grep -E "ffmpeg:[[:space:]]+Mach-O 64-bit executable ${expected_arch}$" signature-diagnostics.log
           codesign --verify --deep --strict --verbose=2 "${{ matrix.app-dir }}" 2>&1 | tee -a signature-diagnostics.log
           codesign -dv --verbose=4 "${{ matrix.app-dir }}" > app-signature.txt 2>&1
           codesign -dv --verbose=4 "$runtime/whisper-cli" > whisper-signature.txt 2>&1
