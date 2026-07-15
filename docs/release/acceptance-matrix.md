@@ -8,7 +8,7 @@
 
 | 대상 | 환경 | 결과 | 실제 신호 |
 |---|---|---:|---|
-| 단위·통합 테스트 | Windows 10.0.26200, Node 22.14.0, 로컬 | PASS | `npm test`: 39 files, 305 tests |
+| 단위·통합 테스트 | Windows 10.0.26200, Node 22.14.0, 로컬 | PASS | `npm test`: 39 files, 311 tests |
 | TypeScript / ESLint / build | Windows 10.0.26200, 로컬 | PASS | `npm run lint`, `npm run typecheck`, `npm run build`: exit 0 |
 | 실제 Electron E2E | Windows 10.0.26200, Electron 43.1.0, 로컬 | PASS | secure renderer, Chromium fake WAV 녹음 후 `recorded`, detail 처리/내보내기 및 dashboard 가져오기 동작 진입점; 1/1 |
 | Windows 시각 회귀 | Windows 10.0.26200, Chromium, 로컬 | PASS | dashboard 녹음 telemetry/일시정지/가져오기와 detail 처리/내보내기 포함 6/6 픽셀 비교 |
