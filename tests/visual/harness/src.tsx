@@ -27,6 +27,10 @@ const settings = {
   getProcessingProviders: async () => ({ transcriptionProvider: 'openai' as const, summaryProvider: 'openai' as const, localWhisperModel: 'base' as const }),
   updateProcessingProviders: async (input: { transcriptionProvider: 'openai' | 'local_whisper'; summaryProvider: 'openai' | 'codex_cli'; localWhisperModel: 'base' | 'small' }) => input,
   listProcessingProviderDescriptors: async () => [],
+  listWhisperModels: async () => [],
+  downloadWhisperModel: async () => { throw new Error() },
+  deleteWhisperModel: async () => { throw new Error() },
+  onWhisperModelProgress: () => () => {},
 }
 const archive = { exportMeeting: async () => ({ status: 'cancelled' as const }), exportMarkdown: async () => ({ status: 'cancelled' as const }), importMeeting: async () => ({ status: 'cancelled' as const }) }
 const processing = { getStatus: async () => ({ meetingId: 'meeting-1', state: 'completed' as const, failedStage: null, retryable: false, audioRequired: false, error: null }), process: async () => ({ meetingId: 'meeting-1', state: 'completed' as const, failedStage: null, retryable: false, audioRequired: false, error: null }), retry: async () => ({ meetingId: 'meeting-1', state: 'completed' as const, failedStage: null, retryable: false, audioRequired: false, error: null }), onProgress: () => () => {} }

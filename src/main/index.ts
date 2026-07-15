@@ -32,6 +32,7 @@ import { OpenAiSummaryAdapter } from './ai/providers/openAiSummaryAdapter'
 import { ProviderRegistry } from './ai/providers/providerRegistry'
 import { CodexCliSummaryAdapter } from './ai/providers/codexCliSummaryAdapter'
 import { runOwnedProcess } from './process/runOwnedProcess'
+import { WhisperModelManager } from './localModels/whisperModelManager'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'nnote-media',
@@ -54,6 +55,7 @@ if (verificationRequest !== null) {
         const meetings = new MeetingRepository(database)
         const credentialStore = new KeyringCredentialStore()
         const processingSettings = new ProcessingSettingsRepository(database)
+        const whisperModels = new WhisperModelManager(join(userDataDirectory, 'models', 'whisper'))
         const registry = new ProviderRegistry(
           [new OpenAiTranscriptionAdapter(new OpenAiGateway(credentialStore))],
           [
@@ -67,6 +69,14 @@ if (verificationRequest !== null) {
           new OpenAiKeyValidator(),
           processingSettings,
           registry,
+          whisperModels,
+          (progress) => {
+            for (const window of BrowserWindow.getAllWindows()) {
+              if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+                window.webContents.send('settings:whisper-model-progress', progress)
+              }
+            }
+          },
         )
         const recordingService = new RecordingService(meetings, recordingsDirectory)
         const templateRepository = new TemplateRepository(database)

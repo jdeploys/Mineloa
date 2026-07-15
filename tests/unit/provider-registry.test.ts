@@ -95,6 +95,8 @@ describe('ProviderRegistry', () => {
         update: (input) => input,
       },
       registry,
+      { list: async () => [], download: async () => { throw new Error() }, delete: async () => { throw new Error() }, onProgress: () => () => undefined },
+      () => undefined,
     )
 
     expect(handlers.has('settings:list-processing-provider-descriptors')).toBe(true)

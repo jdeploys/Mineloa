@@ -7,8 +7,10 @@ export interface ApiKeyStatus {
 
 export const TranscriptionProviderIdSchema = z.enum(['openai', 'local_whisper'])
 export const SummaryProviderIdSchema = z.enum(['openai', 'codex_cli'])
+export const WhisperModelIdSchema = z.enum(['base', 'small'])
 export type TranscriptionProviderId = z.infer<typeof TranscriptionProviderIdSchema>
 export type SummaryProviderId = z.infer<typeof SummaryProviderIdSchema>
+export type WhisperModelId = z.infer<typeof WhisperModelIdSchema>
 
 export const ProviderAvailabilitySchema = z.object({
   available: z.boolean(),
@@ -27,10 +29,31 @@ export type ProcessingProviderDescriptor = z.infer<typeof ProviderDescriptorSche
 export const ProcessingProviderSettingsSchema = z.object({
   transcriptionProvider: TranscriptionProviderIdSchema,
   summaryProvider: SummaryProviderIdSchema,
-  localWhisperModel: z.enum(['base', 'small']),
+  localWhisperModel: WhisperModelIdSchema,
 }).strict()
 
 export type ProcessingProviderSettings = z.infer<typeof ProcessingProviderSettingsSchema>
+
+export const WhisperModelErrorSchema = z.object({
+  code: z.string().regex(/^WHISPER_MODEL_[A-Z_]+$/),
+  message: z.string(),
+}).strict()
+export const WhisperModelStatusSchema = z.object({
+  modelId: WhisperModelIdSchema,
+  state: z.enum(['not_installed', 'downloading', 'installed', 'corrupt']),
+  expectedBytes: z.number().int().nonnegative(),
+  receivedBytes: z.number().int().nonnegative(),
+  error: WhisperModelErrorSchema.nullable(),
+}).strict()
+export const WhisperModelProgressSchema = z.object({
+  modelId: WhisperModelIdSchema,
+  receivedBytes: z.number().int().nonnegative(),
+  totalBytes: z.number().int().positive(),
+}).strict().refine((progress) => progress.receivedBytes <= progress.totalBytes, {
+  message: 'receivedBytes must not exceed totalBytes',
+})
+export type WhisperModelStatus = z.infer<typeof WhisperModelStatusSchema>
+export type WhisperModelProgress = z.infer<typeof WhisperModelProgressSchema>
 
 export interface SettingsApi {
   saveApiKey(value: string): Promise<void>
@@ -39,4 +62,8 @@ export interface SettingsApi {
   getProcessingProviders(): Promise<ProcessingProviderSettings>
   updateProcessingProviders(input: ProcessingProviderSettings): Promise<ProcessingProviderSettings>
   listProcessingProviderDescriptors(): Promise<ProcessingProviderDescriptor[]>
+  listWhisperModels(): Promise<WhisperModelStatus[]>
+  downloadWhisperModel(modelId: WhisperModelId): Promise<WhisperModelStatus>
+  deleteWhisperModel(modelId: WhisperModelId): Promise<WhisperModelStatus>
+  onWhisperModelProgress(listener: (progress: WhisperModelProgress) => void): () => void
 }

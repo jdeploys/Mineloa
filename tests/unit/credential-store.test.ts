@@ -32,6 +32,10 @@ const processingSettings = {
     localWhisperModel: 'base' | 'small'
   }) => input,
 }
+const whisperModels = {
+  list: async () => [], download: async () => { throw new Error() },
+  delete: async () => { throw new Error() }, onProgress: () => () => undefined,
+}
 
 describe('OpenAI credential settings', () => {
   it('maps a missing native keyring entry to null', async () => {
@@ -74,6 +78,8 @@ describe('OpenAI credential settings', () => {
       { validate },
       processingSettings,
       { descriptors: async () => [] },
+      whisperModels,
+      () => undefined,
       () => new Date('2026-07-14T01:02:03.000Z'),
     )
 
@@ -105,6 +111,8 @@ describe('OpenAI credential settings', () => {
       { validate: vi.fn().mockRejectedValue(new Error('Invalid API key')) },
       processingSettings,
       { descriptors: async () => [] },
+      whisperModels,
+      () => undefined,
     )
 
     await expect(handlers.get('settings:save-api-key')?.({}, 'sk-invalid')).rejects.toThrow(

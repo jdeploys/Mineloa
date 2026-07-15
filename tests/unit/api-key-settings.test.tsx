@@ -17,6 +17,10 @@ const processingSettingsApi = () => ({
   getProcessingProviders: vi.fn().mockResolvedValue(defaultProcessingProviderSettings),
   updateProcessingProviders: vi.fn(async (input) => input),
   listProcessingProviderDescriptors: vi.fn().mockResolvedValue([]),
+  listWhisperModels: vi.fn().mockResolvedValue([]),
+  downloadWhisperModel: vi.fn(),
+  deleteWhisperModel: vi.fn(),
+  onWhisperModelProgress: vi.fn(() => () => undefined),
 })
 
 describe('API key settings', () => {
