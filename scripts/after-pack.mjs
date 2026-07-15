@@ -2,6 +2,12 @@ import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { writeRuntimeManifest } from './write-local-runtime-manifest.mjs'
+import { signAsync } from '@electron/osx-sign'
+
+const LOCAL_RUNTIME_SIGN_IGNORE = [
+  String.raw`/Contents/Resources/local-runtime/darwin-(?:x64|arm64)/whisper-cli$`,
+  String.raw`/Contents/Resources/local-runtime/darwin-(?:x64|arm64)/ffmpeg$`,
+]
 
 function runCodesign(run, identity, helper, keychainFile) {
   const signingOptions = identity === '-' ? [] : ['--options', 'runtime', '--timestamp']
@@ -36,9 +42,11 @@ export function createAfterPackHook(dependencies = {}) {
   const run = dependencies.run ?? defaultRun
   const refreshManifest = dependencies.writeManifest ?? writeRuntimeManifest
   const resolveIdentity = dependencies.identity ?? (() => process.env.CSC_NAME?.trim() || '-')
+  const signApplication = dependencies.signApplication ?? signAsync
   return async function signLocalRuntimeHelpers(context) {
     if (context.electronPlatformName !== 'darwin') return
-    const root = join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, 'Contents', 'Resources', 'local-runtime')
+    const app = join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`)
+    const root = join(app, 'Contents', 'Resources', 'local-runtime')
     const targets = readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory())
     if (targets.length !== 1 || !/^darwin-(?:x64|arm64)$/.test(targets[0].name)) {
       throw new Error('Nested helper signing failed: target')
@@ -57,6 +65,16 @@ export function createAfterPackHook(dependencies = {}) {
       arch: targets[0].name.slice('darwin-'.length),
       replaceExisting: true,
     })
+    if (identity === '-') {
+      await signApplication({
+        app,
+        identity: '-',
+        identityValidation: false,
+        ignore: LOCAL_RUNTIME_SIGN_IGNORE,
+        preAutoEntitlements: false,
+        preEmbedProvisioningProfile: false,
+      })
+    }
   }
 }
 

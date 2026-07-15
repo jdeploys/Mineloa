@@ -43,6 +43,7 @@ describe('macOS local runtime signing order', () => {
         return { keychainFile: '/private/tmp/nnote-signing.keychain' }
       }),
     }
+    const signApplication = vi.fn()
     const hook = createAfterPackHook({
       run: (_command, args) => {
         calls.push(args)
@@ -57,11 +58,13 @@ describe('macOS local runtime signing order', () => {
         await writeRuntimeManifest(options)
       },
       identity: () => 'Developer ID Application: Example',
+      signApplication,
     })
 
     await hook(context(target.appOutDir, signingInfo))
 
     expect(order).toEqual(['codeSigningInfo', 'sign:whisper-cli', 'sign:ffmpeg', 'manifest'])
+    expect(signApplication).not.toHaveBeenCalled()
     for (const args of calls) {
       expect(args).toEqual(expect.arrayContaining([
         '--keychain', '/private/tmp/nnote-signing.keychain',
@@ -88,12 +91,14 @@ describe('macOS local runtime signing order', () => {
       },
     }
     const calls: string[][] = []
+    const signApplication = vi.fn()
     const hook = createAfterPackHook({
       run: (_command, args) => {
         calls.push(args)
         return { status: 0, error: undefined }
       },
       identity: () => '-',
+      signApplication,
     })
 
     await hook(context(target.appOutDir, codeSigningInfo))
@@ -104,6 +109,15 @@ describe('macOS local runtime signing order', () => {
       expect(args).not.toContain('--keychain')
       expect(args).toEqual(expect.arrayContaining(['--sign', '-']))
     }
+    expect(signApplication).toHaveBeenCalledWith(expect.objectContaining({
+      app: join(target.appOutDir, 'Nnote.app'),
+      identity: '-',
+      identityValidation: false,
+      ignore: expect.arrayContaining([
+        expect.stringContaining('whisper-cli'),
+        expect.stringContaining('ffmpeg'),
+      ]),
+    }))
   })
 
   it('refuses to replace a linked packaged manifest', async (testContext) => {
