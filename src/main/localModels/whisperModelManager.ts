@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { constants as fsConstants } from 'node:fs'
-import { lstat, mkdir, open, realpath, rename, rm, type FileHandle } from 'node:fs/promises'
+import { lstat, mkdir, open, realpath, rename, rm, unlink, type FileHandle } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import type {
   WhisperModelErrorCode,
@@ -78,9 +78,11 @@ async function cancelResponse(response: Response): Promise<void> {
   if (body?.cancel !== undefined) await body.cancel().catch(() => undefined)
 }
 
-type SecureFileOperation = 'hash' | 'append' | 'truncate'
+type SecureFileOperation = 'hash' | 'append' | 'truncate' | 'remove'
+type MutationOperation = 'truncate' | 'remove'
 interface NodeWhisperModelStorageOptions {
   beforeOpen?: (path: string, operation: SecureFileOperation) => Promise<void> | void
+  beforeMutation?: (path: string, operation: MutationOperation) => Promise<void> | void
 }
 interface OwnedRoot {
   path: string
@@ -99,8 +101,18 @@ function sameFileIdentity(
 
 export class NodeWhisperModelStorage implements WhisperModelStorage {
   private ownedRoot: OwnedRoot | null = null
+  private rootHandle: FileHandle | null = null
+  private readonly hashedIdentities = new Map<string, { dev: bigint; ino: bigint }>()
 
   constructor(private readonly options: NodeWhisperModelStorageOptions = {}) {}
+
+  async close(): Promise<void> {
+    const rootHandle = this.rootHandle
+    this.rootHandle = null
+    this.ownedRoot = null
+    this.hashedIdentities.clear()
+    if (rootHandle !== null) await rootHandle.close()
+  }
 
   async ensureRoot(root: string): Promise<string> {
     const requested = resolve(root)
@@ -115,11 +127,19 @@ export class NodeWhisperModelStorage implements WhisperModelStorage {
       throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
     }
     if (this.ownedRoot === null) {
-      this.ownedRoot = { path: canonical, dev: canonicalStat.dev, ino: canonicalStat.ino }
+      const directoryFlag = typeof fsConstants.O_DIRECTORY === 'number' ? fsConstants.O_DIRECTORY : 0
+      const noFollow = typeof fsConstants.O_NOFOLLOW === 'number' ? fsConstants.O_NOFOLLOW : 0
+      const rootHandle = await open(canonical, fsConstants.O_RDONLY | directoryFlag | noFollow)
+      const handleStat = await rootHandle.stat({ bigint: true })
+      if (!handleStat.isDirectory() || !sameFileIdentity(handleStat, canonicalStat)) {
+        await rootHandle.close()
+        throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+      }
+      this.rootHandle = rootHandle
+      this.ownedRoot = { path: canonical, dev: handleStat.dev, ino: handleStat.ino }
     } else if (
       this.ownedRoot.path !== canonical
-      || this.ownedRoot.dev !== canonicalStat.dev
-      || this.ownedRoot.ino !== canonicalStat.ino
+      || !sameFileIdentity(this.ownedRoot, canonicalStat)
     ) {
       throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
     }
@@ -140,14 +160,20 @@ export class NodeWhisperModelStorage implements WhisperModelStorage {
   }
 
   async hash(path: string): Promise<string> {
-    const { handle } = await this.openVerified(path, fsConstants.O_RDONLY, 'hash')
+    const opened = await this.openVerified(path, fsConstants.O_RDONLY, 'hash')
+    if (opened === null) throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    const { handle } = opened
     try {
       const hash = createHash('sha256')
       const buffer = Buffer.allocUnsafe(1024 * 1024)
       let position = 0
       while (true) {
         const { bytesRead } = await handle.read(buffer, 0, buffer.length, position)
-        if (bytesRead === 0) return hash.digest('hex')
+        if (bytesRead === 0) {
+          const verified = await this.revalidateOpenHandle(path, handle)
+          this.hashedIdentities.set(resolve(path), verified)
+          return hash.digest('hex')
+        }
         hash.update(buffer.subarray(0, bytesRead))
         position += bytesRead
       }
@@ -158,21 +184,65 @@ export class NodeWhisperModelStorage implements WhisperModelStorage {
 
   async remove(path: string): Promise<void> {
     await this.assertOwnedPath(path)
-    await rm(path, { force: true })
+    let entry
+    try {
+      entry = await lstat(path, { bigint: true })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+    if (entry.isSymbolicLink()) {
+      await this.runBeforeMutation(path, 'remove')
+      await this.assertOwnedPath(path)
+      const current = await lstat(path, { bigint: true })
+      if (!current.isSymbolicLink() || !sameFileIdentity(entry, current)) {
+        throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+      }
+      await unlink(path)
+      this.hashedIdentities.delete(resolve(path))
+      return
+    }
+    if (!entry.isFile() || entry.nlink !== 1n) {
+      throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    }
+    const opened = await this.openVerified(path, fsConstants.O_RDONLY, 'remove', true)
+    if (opened === null) return
+    try {
+      await this.runBeforeMutation(path, 'remove')
+      await this.revalidateOpenHandle(path, opened.handle)
+      await rm(path)
+      this.hashedIdentities.delete(resolve(path))
+    } finally {
+      await opened.handle.close()
+    }
   }
 
   async rename(from: string, to: string): Promise<void> {
-    await this.assertOwnedPath(from)
-    await this.assertOwnedPath(to)
-    const before = await lstat(from, { bigint: true })
-    if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n) {
+    const source = resolve(from)
+    const expected = this.hashedIdentities.get(source)
+    if (expected === undefined) throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    const opened = await this.openVerified(from, fsConstants.O_RDONLY, 'hash')
+    if (opened === null || !sameFileIdentity(opened.identity, expected)) {
+      if (opened !== null) await opened.handle.close()
       throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
     }
-    await rename(from, to)
-    const after = await lstat(to, { bigint: true })
-    if (!after.isFile() || after.isSymbolicLink() || !sameFileIdentity(after, before)) {
-      await rm(to, { force: true }).catch(() => undefined)
-      throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    try {
+      await this.assertOwnedPath(to)
+      await this.revalidateOpenHandle(from, opened.handle)
+      await rename(from, to)
+      const after = await lstat(to, { bigint: true })
+      if (!after.isFile() || after.isSymbolicLink() || !sameFileIdentity(after, expected)) {
+        throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+      }
+    } catch (error) {
+      const destination = await this.safeOwnedIdentity(to)
+      if (destination !== null && sameFileIdentity(destination, expected)) {
+        await this.remove(to).catch(() => undefined)
+      }
+      throw error
+    } finally {
+      this.hashedIdentities.delete(source)
+      await opened.handle.close()
     }
   }
 
@@ -183,18 +253,19 @@ export class NodeWhisperModelStorage implements WhisperModelStorage {
     maximumBytes: number,
     onBytes: (bytes: number) => void,
   ): Promise<number> {
-    await this.assertOwnedPath(path)
-    let flags: number
-    if (mode === 'truncate') {
-      await rm(path, { force: true })
-      flags = fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL
-    } else {
-      flags = fsConstants.O_WRONLY | fsConstants.O_APPEND
-    }
-    const { handle, size: existingSize } = await this.openVerified(path, flags, mode)
+    const opened = mode === 'truncate'
+      ? await this.openForTruncate(path)
+      : await this.openVerified(path, fsConstants.O_WRONLY | fsConstants.O_APPEND, mode)
+    if (opened === null) throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    const { handle, size: existingSize } = opened
     const existing = mode === 'append' ? existingSize : 0
     let received = existing
     try {
+      if (mode === 'truncate') {
+        await this.runBeforeMutation(path, 'truncate')
+        await this.revalidateOpenHandle(path, handle)
+        await handle.truncate(0)
+      }
       for await (const chunk of body) {
         received += chunk.byteLength
         if (received > maximumBytes) {
@@ -219,38 +290,99 @@ export class NodeWhisperModelStorage implements WhisperModelStorage {
     path: string,
     flags: number,
     operation: SecureFileOperation,
-  ): Promise<{ handle: FileHandle; size: number }> {
+    allowMissing = false,
+  ): Promise<{ handle: FileHandle; size: number; identity: { dev: bigint; ino: bigint } } | null> {
     await this.assertOwnedPath(path)
-    await this.options.beforeOpen?.(path, operation)
+    try {
+      await this.options.beforeOpen?.(path, operation)
+    } catch {
+      throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    }
+    await this.assertOwnedPath(path)
     const noFollow = typeof fsConstants.O_NOFOLLOW === 'number' ? fsConstants.O_NOFOLLOW : 0
     let handle: FileHandle
     try {
       handle = await open(path, flags | noFollow, 0o600)
-    } catch {
+    } catch (error) {
+      if (allowMissing && (error as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
     }
     try {
+      const identity = await this.revalidateOpenHandle(path, handle)
       const handleStat = await handle.stat({ bigint: true })
-      const pathStat = await lstat(path, { bigint: true })
-      if (
-        !handleStat.isFile()
-        || !pathStat.isFile()
-        || pathStat.isSymbolicLink()
-        || handleStat.nlink !== 1n
-        || pathStat.nlink !== 1n
-        || !sameFileIdentity(handleStat, pathStat)
-      ) {
-        throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
-      }
-      const canonicalFile = await realpath(path)
-      await this.assertOwnedPath(canonicalFile)
-      await this.assertRootIdentity()
-      return { handle, size: Number(handleStat.size) }
+      return { handle, size: Number(handleStat.size), identity }
     } catch (error) {
       await handle.close()
       throw error instanceof WhisperModelError
         ? error
         : new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    }
+  }
+
+  private async openForTruncate(
+    path: string,
+  ): Promise<{ handle: FileHandle; size: number; identity: { dev: bigint; ino: bigint } }> {
+    const existing = await this.openVerified(path, fsConstants.O_RDWR, 'truncate', true)
+    if (existing !== null) return existing
+    await this.assertOwnedPath(path)
+    const noFollow = typeof fsConstants.O_NOFOLLOW === 'number' ? fsConstants.O_NOFOLLOW : 0
+    let handle: FileHandle
+    try {
+      handle = await open(
+        path,
+        fsConstants.O_RDWR | fsConstants.O_CREAT | fsConstants.O_EXCL | noFollow,
+        0o600,
+      )
+    } catch {
+      throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    }
+    try {
+      const identity = await this.revalidateOpenHandle(path, handle)
+      return { handle, size: 0, identity }
+    } catch (error) {
+      await handle.truncate(0).catch(() => undefined)
+      await handle.close()
+      throw error
+    }
+  }
+
+  private async revalidateOpenHandle(
+    path: string,
+    handle: FileHandle,
+  ): Promise<{ dev: bigint; ino: bigint }> {
+    const handleStat = await handle.stat({ bigint: true })
+    const pathStat = await lstat(path, { bigint: true })
+    if (
+      !handleStat.isFile()
+      || !pathStat.isFile()
+      || pathStat.isSymbolicLink()
+      || handleStat.nlink !== 1n
+      || pathStat.nlink !== 1n
+      || !sameFileIdentity(handleStat, pathStat)
+    ) {
+      throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    }
+    const canonicalFile = await realpath(path)
+    await this.assertOwnedPath(canonicalFile)
+    await this.assertRootIdentity()
+    return { dev: handleStat.dev, ino: handleStat.ino }
+  }
+
+  private async runBeforeMutation(path: string, operation: MutationOperation): Promise<void> {
+    try {
+      await this.options.beforeMutation?.(path, operation)
+    } catch {
+      throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    }
+  }
+
+  private async safeOwnedIdentity(path: string): Promise<{ dev: bigint; ino: bigint } | null> {
+    try {
+      await this.assertOwnedPath(path)
+      const info = await lstat(path, { bigint: true })
+      return info.isFile() && !info.isSymbolicLink() ? { dev: info.dev, ino: info.ino } : null
+    } catch {
+      return null
     }
   }
 
@@ -267,13 +399,16 @@ export class NodeWhisperModelStorage implements WhisperModelStorage {
 
   private async assertRootIdentity(): Promise<void> {
     const root = this.ownedRoot
-    if (root === null) throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    const rootHandle = this.rootHandle
+    if (root === null || rootHandle === null) throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')
+    const handleStat = await rootHandle.stat({ bigint: true })
     const rootStat = await lstat(root.path, { bigint: true })
     if (
-      !rootStat.isDirectory()
+      !handleStat.isDirectory()
+      || !rootStat.isDirectory()
       || rootStat.isSymbolicLink()
-      || rootStat.dev !== root.dev
-      || rootStat.ino !== root.ino
+      || !sameFileIdentity(handleStat, root)
+      || !sameFileIdentity(handleStat, rootStat)
       || await realpath(root.path) !== root.path
     ) {
       throw new WhisperModelError('WHISPER_MODEL_INVALID_FILE')

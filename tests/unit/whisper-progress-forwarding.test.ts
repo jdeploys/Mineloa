@@ -31,4 +31,40 @@ describe('Whisper model progress forwarding', () => {
     ], progress)
     expect(healthySend).toHaveBeenCalledWith('settings:whisper-model-progress', progress)
   })
+
+  it.each(['isDestroyed', 'webContents getter', 'webContents isDestroyed'])(
+    'continues after a window throws from %s',
+    (failurePoint) => {
+      const healthySend = vi.fn()
+      const failingWindow = failurePoint === 'isDestroyed'
+        ? { isDestroyed: () => { throw new Error('destroyed race') }, webContents: {} }
+        : failurePoint === 'webContents getter'
+          ? Object.defineProperty({ isDestroyed: () => false }, 'webContents', {
+            get: () => { throw new Error('getter race') },
+          })
+          : {
+            isDestroyed: () => false,
+            webContents: { isDestroyed: () => { throw new Error('contents race') }, send: vi.fn() },
+          }
+
+      publishWhisperProgressToLiveWindows([
+        failingWindow as never,
+        { isDestroyed: () => false, webContents: { isDestroyed: () => false, send: healthySend } },
+      ], progress)
+      expect(healthySend).toHaveBeenCalledWith('settings:whisper-model-progress', progress)
+    },
+  )
+
+  it('reads webContents only once for a live window', () => {
+    const send = vi.fn()
+    const getWebContents = vi.fn(() => ({ isDestroyed: () => false, send }))
+    const window = Object.defineProperty({ isDestroyed: () => false }, 'webContents', {
+      get: getWebContents,
+    })
+
+    publishWhisperProgressToLiveWindows([window as never], progress)
+
+    expect(getWebContents).toHaveBeenCalledTimes(1)
+    expect(send).toHaveBeenCalledWith('settings:whisper-model-progress', progress)
+  })
 })
