@@ -1,5 +1,16 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'electron-vite'
+import type { Plugin } from 'vite'
+
+export function allowViteDevelopmentStyles(html: string): string {
+  return html.replace("style-src 'self'", "style-src 'self' 'unsafe-inline'")
+}
+
+const developmentRendererCsp = (): Plugin => ({
+  name: 'nnote-development-renderer-csp',
+  apply: 'serve',
+  transformIndexHtml: allowViteDevelopmentStyles,
+})
 
 export default defineConfig({
   main: {
@@ -17,6 +28,6 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
-    plugins: [react()],
+    plugins: [developmentRendererCsp(), react()],
   },
 })
