@@ -8,15 +8,15 @@
 
 | 대상 | 환경 | 결과 | 실제 신호 |
 |---|---|---:|---|
-| 단위·통합 테스트 | Windows 10.0.26200, Node 22.14.0, 로컬 | PASS | `npm test`: 40 files, 320 tests |
+| 단위·통합 테스트 | Windows 10.0.26200, Node 22.14.0, 로컬 | PASS | `npm test`: 41 files, 322 tests |
 | TypeScript / ESLint / build | Windows 10.0.26200, 로컬 | PASS | `npm run lint`, `npm run typecheck`, `npm run build`: exit 0 |
 | 실제 Electron E2E | Windows 10.0.26200, Electron 43.1.0, 로컬 | PASS | secure renderer, Chromium fake WAV 녹음 후 `recorded`, detail 처리/내보내기 및 dashboard 가져오기 동작 진입점; 1/1 |
 | Windows 시각 회귀 | Windows 10.0.26200, Chromium, 로컬 | PASS | dashboard 상태와 detail 화면을 포함한 13/13 픽셀 비교 |
 | win-unpacked 런타임 | Windows 10.0.26200, 로컬 | PASS | `main/sqlite/keyring/preload/renderer` 모두 `true` |
 | Windows 설치 프로그램 | Windows 10.0.26200, 로컬 | PASS | `dist/Nnote-0.0.1-win-x64.exe` 생성; Authenticode `NotSigned` |
 | 릴리스 내용 allowlist | Windows 10.0.26200, 로컬 | PASS | ASAR에 `out`, package metadata, SQLite/Keyring 최소 native runtime만 존재; source map/recording/db/archive/env/app tests/src 없음 |
-| macOS 패키지·런타임 | macOS CI/실기기 | PENDING | Windows 결과로 대체하지 않음 |
-| macOS 시각 기준선 | macOS CI | PENDING | 비교 실패 시 CI도 실패하며, 생성된 darwin 후보를 검토·커밋하기 전에는 통과하지 않음 |
+| macOS 패키지·런타임 | macOS 15 Intel·ARM64, GitHub Actions | PASS | Intel/ARM64 DMG 생성; 두 아키텍처 모두 `main/sqlite/keyring/preload/renderer`가 `true`, 실행 파일과 `better_sqlite3.node` 아키텍처 확인 |
+| macOS 시각 기준선 | macOS 15 ARM64, GitHub Actions | PASS | 원본 후보 6장을 직접 검토한 뒤 추적 기준선으로 커밋; 새 러너 비교 6/6 통과 |
 
 ## 수동 실기기 검증
 
