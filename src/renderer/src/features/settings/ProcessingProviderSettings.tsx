@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   ProcessingProviderDescriptor,
   ProcessingProviderSettings as ProcessingSettings,
@@ -16,6 +16,17 @@ export function ProcessingProviderSettings({ settings }: { settings: SettingsApi
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const generation = useRef(0)
+  const descriptorGeneration = useRef(0)
+
+  const refreshDescriptors = useCallback(async () => {
+    const current = ++descriptorGeneration.current
+    try {
+      const next = await settings.listProcessingProviderDescriptors()
+      if (descriptorGeneration.current === current) setDescriptors(next)
+    } catch {
+      if (descriptorGeneration.current === current) setError(loadError)
+    }
+  }, [settings])
 
   useEffect(() => {
     const current = ++generation.current
@@ -29,7 +40,10 @@ export function ProcessingProviderSettings({ settings }: { settings: SettingsApi
     }).catch(() => {
       if (generation.current === current) setError(loadError)
     })
-    return () => { generation.current += 1 }
+    return () => {
+      generation.current += 1
+      descriptorGeneration.current += 1
+    }
   }, [settings])
 
   const persist = async (next: ProcessingSettings) => {
@@ -38,7 +52,10 @@ export function ProcessingProviderSettings({ settings }: { settings: SettingsApi
     setError(null)
     try {
       const persisted = await settings.updateProcessingProviders(next)
-      if (generation.current === current) setValue(persisted)
+      if (generation.current === current) {
+        setValue(persisted)
+        await refreshDescriptors()
+      }
     } catch {
       if (generation.current === current) setError(updateError)
     } finally {
@@ -55,7 +72,8 @@ export function ProcessingProviderSettings({ settings }: { settings: SettingsApi
   const summary = descriptors.find((item) => item.stage === 'summary' && item.id === value.summaryProvider)
   const modelManager = transcription?.capabilities.includes('model_manager') === true
   const cliStatus = summary?.capabilities.includes('cli_status') === true
-  const openAiCapabilities = transcription?.capabilities.includes('api_key') === true
+  const openAiCapabilities = transcription?.privacy === 'audio_cloud'
+    && transcription.capabilities.includes('api_key')
     && transcription.capabilities.includes('speaker_diarization')
 
   return <section className="processing-settings" aria-label="처리 방식 설정">
@@ -85,7 +103,7 @@ export function ProcessingProviderSettings({ settings }: { settings: SettingsApi
           </label>}
         </div>
         {openAiCapabilities && <div className="provider-notice"><p>OpenAI API 키를 사용하며 화자 분리를 지원합니다.</p></div>}
-        {modelManager && transcription !== undefined && <WhisperModelSettings settings={settings} modelId={value.localWhisperModel} descriptor={transcription} />}
+        {modelManager && transcription !== undefined && <WhisperModelSettings settings={settings} modelId={value.localWhisperModel} descriptor={transcription} onAvailabilityChanged={refreshDescriptors} />}
         {cliStatus && summary !== undefined && <CodexCliStatus descriptor={summary} />}
         {error !== null && <p role="alert" className="settings-alert">{error}</p>}
       </div>

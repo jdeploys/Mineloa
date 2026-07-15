@@ -1,14 +1,16 @@
 import { expect, test, type Page } from '@playwright/test'
-import { hasTask10VisualBaseline } from './platformSupport'
-
 test.skip(
-  !hasTask10VisualBaseline(process.platform),
-  `Processing settings visual comparisons support Windows and macOS, not ${process.platform}.`,
+  process.platform !== 'win32',
+  `Processing settings snapshots have reviewed Windows baselines only; ${process.platform} is skipped until native baselines are reviewed.`,
 )
 
 async function open(page: Page, state: string, expanded: boolean) {
   await page.goto(`/?state=${state}`)
   await expect(page.getByRole('heading', { name: '설정', exact: true })).toBeVisible()
+  const apiCard = page.getByRole('region', { name: 'API 키 설정' })
+  await expect(apiCard).toContainText('저장된 API 키 삭제')
+  await expect(apiCard.getByText('설정됨', { exact: true })).toBeVisible()
+  await expect(apiCard.getByLabel('OpenAI API 키')).toBeVisible()
   await page.getByLabel('전사 방식').waitFor({ state: 'attached' })
   if (expanded) await page.getByText('고급 처리 옵션', { exact: true }).click()
   const markers: Record<string, string> = {
@@ -20,6 +22,23 @@ async function open(page: Page, state: string, expanded: boolean) {
     'codex-unavailable': 'Codex CLI 설정이 올바르지 않습니다. 터미널에서 설정을 확인한 뒤 다시 시도하세요.',
   }
   await expect(page.getByText(markers[state], { exact: true }).first()).toBeVisible()
+  if (expanded) {
+    await expect(page.getByLabel('전사 방식')).toBeVisible()
+    await expect(page.getByLabel('요약 방식')).toBeVisible()
+  }
+  await expect.poll(() => page.evaluate(({ expanded }) => {
+    const api = document.querySelector<HTMLElement>('.settings-panel')
+    const processing = document.querySelector<HTMLElement>('.processing-settings')
+    const selectors = [...document.querySelectorAll<HTMLElement>('.provider-grid select')]
+    const hasPaintableBox = (element: HTMLElement | null) => element !== null
+      && element.getBoundingClientRect().width > 100
+      && element.getBoundingClientRect().height > 30
+    return hasPaintableBox(api)
+      && hasPaintableBox(processing)
+      && (api?.innerText.includes('API 키 설정') ?? false)
+      && (api?.innerText.includes('저장된 API 키 삭제') ?? false)
+      && (!expanded || (selectors.length >= 2 && selectors.every(hasPaintableBox)))
+  }, { expanded })).toBe(true)
   await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
   await page.waitForTimeout(150)
 }

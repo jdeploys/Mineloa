@@ -13,10 +13,10 @@ export function CodexCliStatus({ descriptor }: { descriptor: ProcessingProviderD
     : guidance[descriptor.availability.code ?? ''] ?? guidance.CODEX_UNAVAILABLE
 
   return <section className="cli-status" aria-label="Codex CLI 상태">
-    <div className="provider-notice provider-notice-cloud">
+    {descriptor.privacy === 'text_cloud' && <div className="provider-notice provider-notice-cloud">
       <strong>전사문이 Codex 계정으로 전송됩니다.</strong>
       <p>로컬 추론이 아닌 클라우드 처리입니다.</p>
-    </div>
+    </div>}
     <div className="provider-status-row">
       <span className={`status-dot ${descriptor.availability.available ? 'is-ready' : 'is-warning'}`} aria-hidden="true" />
       <p>{status}</p>

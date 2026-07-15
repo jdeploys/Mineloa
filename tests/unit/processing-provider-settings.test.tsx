@@ -107,6 +107,46 @@ describe('processing provider settings visible outcomes', () => {
     expect(document.body.textContent).not.toMatch(/[A-Z]:\\|\/Users\//)
   })
 
+  it('enables the newly selected small model while a stale base download remains pending', async () => {
+    let finishBase!: (status: WhisperModelStatus) => void
+    const pendingBase = new Promise<WhisperModelStatus>((resolve) => { finishBase = resolve })
+    const api = settingsApi({
+      downloadWhisperModel: vi.fn((id) => id === 'base' ? pendingBase : Promise.resolve(model('small', 'installed', 487_601_967))),
+    })
+    render(<ProcessingProviderSettingsView settings={api} />)
+    await expand()
+    await userEvent.setup().selectOptions(screen.getByLabelText('전사 방식'), 'local_whisper')
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'base 모델 다운로드' }))
+    await userEvent.setup().selectOptions(screen.getByLabelText('로컬 모델'), 'small')
+
+    expect(await screen.findByRole('button', { name: 'small 모델 다운로드' })).toBeEnabled()
+    await act(async () => finishBase(model('base', 'installed', 147_951_465)))
+    expect(screen.getByRole('button', { name: 'small 모델 다운로드' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'base 모델 삭제' })).not.toBeInTheDocument()
+  })
+
+  it('refreshes descriptor availability after model download without changing provider selections', async () => {
+    const available = descriptors.map((descriptor) => descriptor.id === 'local_whisper'
+      ? { ...descriptor, availability: { available: true, code: null, message: null } }
+      : descriptor)
+    const listDescriptors = vi.fn()
+      .mockResolvedValueOnce(descriptors)
+      .mockResolvedValueOnce(descriptors)
+      .mockResolvedValue(available)
+    const api = settingsApi({ listProcessingProviderDescriptors: listDescriptors })
+    render(<ProcessingProviderSettingsView settings={api} />)
+    await expand()
+    await userEvent.setup().selectOptions(screen.getByLabelText('전사 방식'), 'local_whisper')
+    expect(await screen.findByText('로컬 처리 구성 요소 또는 선택한 모델을 아직 사용할 수 없습니다.')).toBeVisible()
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'base 모델 다운로드' }))
+
+    expect(await screen.findByText('로컬 처리 구성 요소를 사용할 수 있습니다.')).toBeVisible()
+    expect(screen.getByLabelText('전사 방식')).toHaveValue('local_whisper')
+    expect(screen.getByLabelText('요약 방식')).toHaveValue('openai')
+    expect(screen.getByLabelText('로컬 모델')).toHaveValue('base')
+    expect(listDescriptors).toHaveBeenCalledTimes(3)
+  })
+
   it('labels Codex summary as transcript cloud processing', async () => {
     render(<ProcessingProviderSettingsView settings={settingsApi()} />)
     await expand()
