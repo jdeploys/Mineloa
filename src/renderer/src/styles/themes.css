@@ -17,6 +17,16 @@
   --ink-tertiary: var(--ink-subtle);
   --hairline-strong: #c1c1c1;
   --primary-hover: var(--primary-active);
+  --action-primary-surface: #d50b3e;
+  --action-primary-surface-hover: #bd0a36;
+  --action-primary-foreground: #ffffff;
+  --action-primary-disabled-surface: #f4d8de;
+  --action-primary-disabled-foreground: #672232;
+  --status-badge-success-foreground: #147a39;
+  --status-badge-warning-foreground: #9a5d00;
+  --status-badge-danger-foreground: var(--danger);
+  --status-badge-active-surface: color-mix(in srgb, var(--primary) 8%, transparent);
+  --status-badge-active-foreground: #bd0a36;
 }
 
 :root[data-theme='dark'] {
@@ -37,4 +47,14 @@
   --ink-tertiary: var(--ink-subtle);
   --hairline-strong: #625b54;
   --primary-hover: var(--primary-active);
+  --action-primary-surface: #d50b3e;
+  --action-primary-surface-hover: #bd0a36;
+  --action-primary-foreground: #ffffff;
+  --action-primary-disabled-surface: #5b3941;
+  --action-primary-disabled-foreground: #f4dfe4;
+  --status-badge-success-foreground: #6fdc91;
+  --status-badge-warning-foreground: #f2b95f;
+  --status-badge-danger-foreground: var(--danger);
+  --status-badge-active-surface: color-mix(in srgb, var(--primary) 8%, transparent);
+  --status-badge-active-foreground: #ff94a7;
 }

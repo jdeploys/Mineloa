@@ -9,10 +9,10 @@
 
 .surface-card { min-width: 0; border: 1px solid var(--hairline); border-radius: var(--radius-card); background: var(--surface-1); padding: 24px; }
 .status-badge { display: inline-flex; align-items: center; width: fit-content; border: 1px solid var(--hairline); border-radius: var(--radius-full); background: var(--surface-2); color: var(--ink-subtle); padding: 4px 8px; font-size: var(--type-size-badge); font-weight: 600; line-height: 1.2; }
-.status-badge[data-tone='success'] { color: #147a39; }
-.status-badge[data-tone='warning'] { color: #9a5d00; }
-.status-badge[data-tone='danger'] { color: var(--danger); }
-.status-badge[data-tone='active'] { border-color: color-mix(in srgb, var(--primary) 35%, var(--hairline)); background: color-mix(in srgb, var(--primary) 8%, transparent); color: var(--primary-active); }
+.status-badge[data-tone='success'] { color: var(--status-badge-success-foreground); }
+.status-badge[data-tone='warning'] { color: var(--status-badge-warning-foreground); }
+.status-badge[data-tone='danger'] { color: var(--status-badge-danger-foreground); }
+.status-badge[data-tone='active'] { border-color: color-mix(in srgb, var(--primary) 35%, var(--hairline)); background: var(--status-badge-active-surface); color: var(--status-badge-active-foreground); }
 
 .page-header { display: grid; gap: 12px; margin-bottom: 24px; }
 .page-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }

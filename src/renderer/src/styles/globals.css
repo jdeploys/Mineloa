@@ -74,23 +74,25 @@ textarea {
 
 .ui-button[data-variant='primary'],
 .button-primary {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: #ffffff;
+  border-color: var(--action-primary-surface);
+  background: var(--action-primary-surface);
+  color: var(--action-primary-foreground);
 }
 
 .ui-button[data-variant='primary']:hover:not(:disabled),
 .ui-button[data-variant='primary']:active:not(:disabled),
 .button-primary:hover:not(:disabled),
 .button-primary:active:not(:disabled) {
-  border-color: var(--primary-active);
-  background: var(--primary-active);
+  border-color: var(--action-primary-surface-hover);
+  background: var(--action-primary-surface-hover);
 }
 
 .ui-button[data-variant='primary']:disabled,
 .button-primary:disabled {
-  border-color: var(--primary-disabled);
-  background: var(--primary-disabled);
+  border-color: var(--action-primary-disabled-surface);
+  background: var(--action-primary-disabled-surface);
+  color: var(--action-primary-disabled-foreground);
+  opacity: 1;
 }
 
 .ui-button[data-variant='tertiary'] {

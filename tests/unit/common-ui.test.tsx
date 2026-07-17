@@ -174,7 +174,7 @@ describe('common UI semantics', () => {
 
     expect(globals).toMatch(/\.ui-button[^}]*min-height:\s*48px/s)
     expect(globals).toMatch(/\.ui-button[^}]*border-radius:\s*var\(--radius-control\)/s)
-    expect(globals).toMatch(/\.ui-button\[data-variant='primary'\][^}]*var\(--primary\)/s)
+    expect(globals).toMatch(/\.ui-button\[data-variant='primary'\][^}]*var\(--action-primary-surface\)/s)
     expect(app).toMatch(/\.surface-card[^}]*border:\s*1px solid var\(--hairline\)/s)
     expect(app).toMatch(/\.surface-card[^}]*border-radius:\s*var\(--radius-card\)/s)
     expect(app).toContain('.inline-notice')
@@ -185,10 +185,10 @@ describe('common UI semantics', () => {
     const globals = readFileSync('src/renderer/src/styles/globals.css', 'utf8')
 
     expect(globals).toMatch(
-      /\.ui-button\[data-variant='primary'\],\s*\.button-primary\s*\{[^}]*var\(--primary\)/s,
+      /\.ui-button\[data-variant='primary'\],\s*\.button-primary\s*\{[^}]*var\(--action-primary-surface\)/s,
     )
     expect(globals).toMatch(
-      /\.button-primary:hover:not\(:disabled\),\s*\.button-primary:active:not\(:disabled\)\s*\{[^}]*var\(--primary-active\)/s,
+      /\.button-primary:hover:not\(:disabled\),\s*\.button-primary:active:not\(:disabled\)\s*\{[^}]*var\(--action-primary-surface-hover\)/s,
     )
     expect(globals).toMatch(
       /\.ui-button\[data-variant='danger'\],\s*\.button-danger\s*\{[^}]*var\(--danger\)/s,
