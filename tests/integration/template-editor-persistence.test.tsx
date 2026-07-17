@@ -23,7 +23,7 @@ afterEach(() => {
 })
 
 describe('TemplateEditor persistence', () => {
-  it('persists section additions and removals through the real template service', async () => {
+  it('persists name and current sections through the template editor save action', async () => {
     const root = mkdtempSync(join(tmpdir(), 'nnote-template-editor-'))
     roots.push(root)
     const database = openDatabase(join(root, 'nnote.sqlite'))
@@ -45,13 +45,16 @@ describe('TemplateEditor persistence', () => {
     render(<TemplateEditor templates={api} />)
 
     await user.click(await screen.findByRole('button', { name: custom.name }))
+    await user.clear(screen.getByLabelText('템플릿 이름'))
+    await user.type(screen.getByLabelText('템플릿 이름'), '고객 인터뷰')
     await user.click(screen.getByRole('button', { name: '섹션 추가' }))
-    await user.click(screen.getByRole('button', { name: '섹션 저장' }))
+    await user.click(screen.getByRole('button', { name: '템플릿 저장' }))
+    expect(service.get(custom.id).name).toBe('고객 인터뷰')
     expect(service.get(custom.id).sections).toHaveLength(2)
     const addedId = service.get(custom.id).sections[1]!.id
 
     await user.click(screen.getAllByRole('button', { name: '섹션 제거' })[0]!)
-    await user.click(screen.getByRole('button', { name: '섹션 저장' }))
+    await user.click(screen.getByRole('button', { name: '템플릿 저장' }))
     expect(service.get(custom.id).sections.map(({ id }) => id)).toEqual([addedId])
   })
 })

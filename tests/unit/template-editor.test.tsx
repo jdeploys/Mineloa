@@ -16,27 +16,64 @@ const defaultTemplate = {
 }
 
 describe('TemplateEditor', () => {
-  it('allows a user template rename and reorder', async () => {
+  it('saves the editable template name and sections through one primary action', async () => {
     const user = userEvent.setup()
-    const custom = { ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const, sections: [defaultTemplate.sections[0]!, { id: '10000000-0000-4000-8000-000000000002', title: '할 일', kind: 'action_items' as const, prompt: '할 일' }] }
-    const api = { list: vi.fn().mockResolvedValue([defaultTemplate, custom]), create: vi.fn(), update: vi.fn().mockResolvedValue({ ...custom, name: '새 이름' }), reorderSections: vi.fn().mockResolvedValue(custom), delete: vi.fn() } satisfies TemplatesApi
+    const editableTemplate = { ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const }
+    const api = {
+      list: vi.fn(async () => [editableTemplate]),
+      create: vi.fn(),
+      update: vi.fn(async (_id, input) => ({
+        ...editableTemplate,
+        name: input.name ?? editableTemplate.name,
+        sections: input.sections ?? editableTemplate.sections,
+      })),
+      reorderSections: vi.fn(),
+      delete: vi.fn(),
+    } satisfies TemplatesApi
     render(<TemplateEditor templates={api} />)
-    expect(await screen.findByRole('navigation', { name: '템플릿 목록' })).toHaveClass('template-list')
-    await user.click(await screen.findByRole('button', { name: '사용자' }))
+    await screen.findByDisplayValue('사용자')
     await user.clear(screen.getByLabelText('템플릿 이름'))
     await user.type(screen.getByLabelText('템플릿 이름'), '새 이름')
-    await user.click(screen.getByRole('button', { name: '이름 저장' }))
-    await user.click(screen.getAllByRole('button', { name: '위로 이동' })[1]!)
-    expect(api.update).toHaveBeenCalledWith('custom', { name: '새 이름' })
-    expect(api.reorderSections).toHaveBeenCalledWith('custom', [custom.sections[1]!.id, custom.sections[0]!.id])
+    await user.clear(screen.getByLabelText('섹션 1 지시문'))
+    await user.type(screen.getByLabelText('섹션 1 지시문'), '핵심 니즈를 요약하세요.')
+    await user.click(screen.getByRole('button', { name: '템플릿 저장' }))
+    expect(api.update).toHaveBeenCalledTimes(1)
+    expect(api.update).toHaveBeenCalledWith(editableTemplate.id, {
+      name: '새 이름',
+      sections: [expect.objectContaining({ prompt: '핵심 니즈를 요약하세요.' })],
+    })
   })
 
-  it('shows the default as immutable and exposes no mutation controls', async () => {
+  it('keeps the default template read-only and free of save or delete actions', async () => {
     const api = { list: vi.fn().mockResolvedValue([defaultTemplate]), create: vi.fn(), update: vi.fn(), reorderSections: vi.fn(), delete: vi.fn() } satisfies TemplatesApi
     render(<TemplateEditor templates={api} />)
-    expect(await screen.findByText('기본 템플릿은 수정하거나 삭제할 수 없습니다.')).toBeInTheDocument()
-    expect(screen.queryByLabelText('템플릿 이름')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '삭제' })).not.toBeInTheDocument()
+    expect(await screen.findByText('기본 템플릿은 수정하거나 삭제할 수 없습니다.')).toBeVisible()
+    expect(screen.queryByRole('button', { name: '템플릿 저장' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '템플릿 삭제' })).not.toBeInTheDocument()
+  })
+
+  it('shows the editable template primary actions and field labels', async () => {
+    const editableTemplate = { ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const }
+    const api = { list: vi.fn(async () => [editableTemplate]), create: vi.fn(), update: vi.fn(), reorderSections: vi.fn(), delete: vi.fn() } satisfies TemplatesApi
+    render(<TemplateEditor templates={api} />)
+    expect(await screen.findByRole('button', { name: editableTemplate.name })).toHaveAttribute('aria-current', 'true')
+    await screen.findByLabelText('섹션 1 지시문')
+    expect(screen.getByLabelText('템플릿 이름')).toBeVisible()
+    expect(screen.getByLabelText('섹션 1 지시문')).toBeVisible()
+    expect(screen.getByRole('button', { name: '섹션 추가' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '템플릿 저장' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '템플릿 삭제' })).toBeVisible()
+  })
+
+  it('reorders editable template sections without saving the rest of the form', async () => {
+    const user = userEvent.setup()
+    const custom = { ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const, sections: [defaultTemplate.sections[0]!, { id: '10000000-0000-4000-8000-000000000002', title: '할 일', kind: 'action_items' as const, prompt: '할 일' }] }
+    const api = { list: vi.fn().mockResolvedValue([custom]), create: vi.fn(), update: vi.fn(), reorderSections: vi.fn().mockResolvedValue(custom), delete: vi.fn() } satisfies TemplatesApi
+    render(<TemplateEditor templates={api} />)
+    await screen.findByLabelText('섹션 2 제목')
+    await user.click(screen.getAllByRole('button', { name: '위로 이동' })[1]!)
+    expect(api.reorderSections).toHaveBeenCalledWith('custom', [custom.sections[1]!.id, custom.sections[0]!.id])
+    expect(api.update).not.toHaveBeenCalled()
   })
 
   it('adds edits and removes custom sections while preserving one-to-eight validation', async () => {
@@ -57,8 +94,11 @@ describe('TemplateEditor', () => {
     await user.click(screen.getByRole('button', { name: '섹션 추가' }))
     expect(screen.getByLabelText('섹션 2 제목')).toBeInTheDocument()
     await user.click(screen.getAllByRole('button', { name: '섹션 제거' })[1]!)
-    await user.click(screen.getByRole('button', { name: '섹션 저장' }))
-    expect(api.update).toHaveBeenCalledWith('custom', { sections: [expect.objectContaining({ title: '결론', kind: 'bullet_list', prompt: '결론을 목록으로 정리하세요.' })] })
+    await user.click(screen.getByRole('button', { name: '템플릿 저장' }))
+    expect(api.update).toHaveBeenCalledWith('custom', {
+      name: '사용자',
+      sections: [expect.objectContaining({ title: '결론', kind: 'bullet_list', prompt: '결론을 목록으로 정리하세요.' })],
+    })
     expect(screen.getByRole('button', { name: '섹션 제거' })).toBeDisabled()
   })
 
@@ -77,6 +117,27 @@ describe('TemplateEditor', () => {
     expect(within(screen.getByLabelText('섹션 1 종류')).getByRole('option', { name: '할 일' })).not.toBeDisabled()
   })
 
+  it('keeps editable templates within the eight-section maximum', async () => {
+    const user = userEvent.setup()
+    const custom = { ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const }
+    const api = { list: vi.fn().mockResolvedValue([custom]), create: vi.fn(), update: vi.fn(), reorderSections: vi.fn(), delete: vi.fn() } satisfies TemplatesApi
+    render(<TemplateEditor templates={api} />)
+    const add = await screen.findByRole('button', { name: '섹션 추가' })
+    for (let index = 1; index < 8; index += 1) await user.click(add)
+    expect(screen.getAllByRole('button', { name: '섹션 제거' })).toHaveLength(8)
+    expect(add).toBeDisabled()
+  })
+
+  it('keeps template deletion as a separate danger action', async () => {
+    const user = userEvent.setup()
+    const custom = { ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const }
+    const api = { list: vi.fn().mockResolvedValue([custom]), create: vi.fn(), update: vi.fn(), reorderSections: vi.fn(), delete: vi.fn().mockResolvedValue(undefined) } satisfies TemplatesApi
+    render(<TemplateEditor templates={api} />)
+    await user.click(await screen.findByRole('button', { name: '템플릿 삭제' }))
+    expect(api.delete).toHaveBeenCalledWith(custom.id)
+    expect(api.update).not.toHaveBeenCalled()
+  })
+
   it('shows a safe in-use message when a referenced template edit is refused', async () => {
     const user = userEvent.setup()
     const custom = { ...defaultTemplate, id: 'custom', name: '사용자', isDefault: false as const }
@@ -87,7 +148,7 @@ describe('TemplateEditor', () => {
     } satisfies TemplatesApi
     render(<TemplateEditor templates={api} />)
     await screen.findByLabelText('섹션 1 제목')
-    await user.click(screen.getByRole('button', { name: '섹션 저장' }))
+    await user.click(screen.getByRole('button', { name: '템플릿 저장' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('회의에서 사용 중인 템플릿은 변경할 수 없습니다.')
   })
 })

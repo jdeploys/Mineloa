@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { SummaryTemplate, SummaryTemplateSection, TemplateSectionKind, TemplatesApi } from '../../../../shared/contracts/template'
+import { InlineNotice } from '../../components/feedback/InlineNotice'
+import { FieldHelp } from '../../components/help/FieldHelp'
+import { ActionBar } from '../../components/layout/ActionBar'
+import { Button } from '../../components/ui/Button'
+import { SurfaceCard } from '../../components/ui/SurfaceCard'
 
 interface TemplateEditorProps {
   templates: TemplatesApi
@@ -38,14 +43,14 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
     setSections(selected?.sections ?? [])
   }, [selected?.id, selected?.name, selected?.sections])
 
-  async function saveName() {
+  async function saveTemplate() {
     if (!selected || selected.isDefault) return
     try {
-      const updated = await api.update(selected.id, { name })
+      const updated = await api.update(selected.id, { name, sections })
       setItems((current) => current.map((item) => item.id === updated.id ? updated : item))
       setError(null)
     } catch (caught) {
-      setError(templateMutationError(caught, '템플릿 이름을 저장하지 못했습니다.'))
+      setError(templateMutationError(caught, '템플릿을 저장하지 못했습니다.'))
     }
   }
 
@@ -93,17 +98,6 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
     setSections((current) => current.filter((_section, position) => position !== index))
   }
 
-  async function saveSections() {
-    if (!selected || selected.isDefault) return
-    try {
-      const updated = await api.update(selected.id, { sections })
-      setItems((current) => current.map((item) => item.id === updated.id ? updated : item))
-      setError(null)
-    } catch (caught) {
-      setError(templateMutationError(caught, '템플릿 섹션을 저장하지 못했습니다.'))
-    }
-  }
-
   async function deleteTemplate() {
     if (!selected || selected.isDefault) return
     try {
@@ -111,31 +105,96 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
       const remaining = items.filter(({ id }) => id !== selected.id)
       setItems(remaining)
       setSelectedId(remaining[0]?.id ?? null)
-    } catch {
-      setError('템플릿을 삭제하지 못했습니다.')
+      setError(null)
+    } catch (caught) {
+      setError(templateMutationError(caught, '템플릿을 삭제하지 못했습니다.'))
     }
   }
 
   return <section className="template-layout" aria-label="요약 템플릿">
-    <nav className="template-list" aria-label="템플릿 목록">
-      {items.map((template) => <button key={template.id} type="button" onClick={() => setSelectedId(template.id)}>{template.name}</button>)}
-      <button type="button" onClick={createTemplate}>새 템플릿</button>
-    </nav>
-    {error && <p role="alert">{error}</p>}
-    {selected?.isDefault ? <p className="template-lock">기본 템플릿은 수정하거나 삭제할 수 없습니다.</p> : selected ? <div className="template-editor">
-      <label>템플릿 이름 <input aria-label="템플릿 이름" value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <button type="button" onClick={saveName}>이름 저장</button>
-      <ol>{sections.map((section, index) => <li className="template-section-card" key={section.id}>
-        <label>섹션 {index + 1} 제목 <input aria-label={`섹션 ${index + 1} 제목`} value={section.title} onChange={(event) => updateSection(index, { title: event.target.value })} /></label>
-        <label>종류 <select aria-label={`섹션 ${index + 1} 종류`} value={section.kind} onChange={(event) => updateSection(index, { kind: event.target.value as TemplateSectionKind })}><option value="paragraph">문단</option><option value="bullet_list">목록</option><option value="action_items" disabled={sections.some((candidate, position) => position !== index && candidate.kind === 'action_items')}>할 일</option></select></label>
-        <label>지시문 <textarea aria-label={`섹션 ${index + 1} 지시문`} value={section.prompt} onChange={(event) => updateSection(index, { prompt: event.target.value })} /></label>
-        <button type="button" aria-label="위로 이동" disabled={index === 0} onClick={() => moveSection(index, -1)}>↑</button>
-        <button type="button" aria-label="아래로 이동" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)}>↓</button>
-        <button type="button" aria-label="섹션 제거" disabled={sections.length <= 1} onClick={() => removeSection(index)}>제거</button>
-      </li>)}</ol>
-      <button type="button" disabled={sections.length >= 8} onClick={addSection}>섹션 추가</button>
-      <button type="button" onClick={() => void saveSections()}>섹션 저장</button>
-      <button type="button" onClick={deleteTemplate}>삭제</button>
-    </div> : null}
+    <SurfaceCard as="div" className="template-master" labelledBy="template-list-heading">
+      <div className="template-master-heading">
+        <h2 id="template-list-heading">템플릿 목록</h2>
+        <FieldHelp>회의에 적용할 요약 구조를 선택하세요.</FieldHelp>
+      </div>
+      <nav className="template-list" aria-label="템플릿 목록">
+        {items.map((template) => <Button
+          key={template.id}
+          type="button"
+          variant="tertiary"
+          aria-current={selected?.id === template.id ? 'true' : undefined}
+          onClick={() => setSelectedId(template.id)}
+        >{template.name}</Button>)}
+      </nav>
+      <Button type="button" onClick={createTemplate}>새 템플릿</Button>
+    </SurfaceCard>
+
+    <div className="template-detail">
+      {error && <InlineNotice tone="error" title="템플릿 작업 실패"><p>{error}</p></InlineNotice>}
+      {selected?.isDefault ? <SurfaceCard as="div" className="template-lock" labelledBy="template-lock-heading">
+        <h2 id="template-lock-heading">{selected.name}</h2>
+        <InlineNotice title="읽기 전용 템플릿">
+          <p>기본 템플릿은 수정하거나 삭제할 수 없습니다.</p>
+        </InlineNotice>
+      </SurfaceCard> : selected ? <SurfaceCard as="div" className="template-editor" labelledBy="template-editor-heading">
+        <div className="template-editor-heading">
+          <div>
+            <h2 id="template-editor-heading">템플릿 편집</h2>
+            <FieldHelp>이름과 현재 섹션을 한 번에 저장합니다.</FieldHelp>
+          </div>
+        </div>
+
+        <label className="template-name-field">템플릿 이름
+          <input aria-label="템플릿 이름" value={name} onChange={(event) => setName(event.target.value)} />
+        </label>
+
+        <div className="template-sections-heading">
+          <div>
+            <h3>요약 섹션</h3>
+            <FieldHelp>섹션은 1개 이상 8개 이하로 구성할 수 있습니다.</FieldHelp>
+          </div>
+          <span>{sections.length} / 8</span>
+        </div>
+
+        <ol className="template-sections">{sections.map((section, index) => <li className="template-section-card" key={section.id}>
+          <div className="template-section-heading">
+            <h3>섹션 {index + 1}</h3>
+            <div className="template-section-actions">
+              <Button type="button" variant="tertiary" aria-label="위로 이동" disabled={index === 0} onClick={() => moveSection(index, -1)}>위로</Button>
+              <Button type="button" variant="tertiary" aria-label="아래로 이동" disabled={index === sections.length - 1} onClick={() => moveSection(index, 1)}>아래로</Button>
+              <Button type="button" variant="tertiary" aria-label="섹션 제거" disabled={sections.length <= 1} onClick={() => removeSection(index)}>제거</Button>
+            </div>
+          </div>
+          <div className="template-section-fields">
+            <label>제목
+              <input aria-label={`섹션 ${index + 1} 제목`} value={section.title} onChange={(event) => updateSection(index, { title: event.target.value })} />
+            </label>
+            <label>종류
+              <select aria-label={`섹션 ${index + 1} 종류`} value={section.kind} onChange={(event) => updateSection(index, { kind: event.target.value as TemplateSectionKind })}>
+                <option value="paragraph">문단</option>
+                <option value="bullet_list">목록</option>
+                <option value="action_items" disabled={sections.some((candidate, position) => position !== index && candidate.kind === 'action_items')}>할 일</option>
+              </select>
+            </label>
+          </div>
+          <label className="template-prompt-field">지시문
+            <textarea aria-label={`섹션 ${index + 1} 지시문`} value={section.prompt} onChange={(event) => updateSection(index, { prompt: event.target.value })} />
+          </label>
+        </li>)}</ol>
+
+        <ActionBar>
+          <Button type="button" disabled={sections.length >= 8} onClick={addSection}>섹션 추가</Button>
+          <Button type="button" variant="primary" onClick={() => void saveTemplate()}>템플릿 저장</Button>
+        </ActionBar>
+
+        <div className="danger-zone template-danger-zone">
+          <div>
+            <strong>템플릿 삭제</strong>
+            <p>이 템플릿을 목록에서 영구적으로 삭제합니다.</p>
+          </div>
+          <Button type="button" variant="danger" onClick={() => void deleteTemplate()}>템플릿 삭제</Button>
+        </div>
+      </SurfaceCard> : null}
+    </div>
   </section>
 }
