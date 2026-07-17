@@ -143,7 +143,9 @@ function desktopApiFor(state: string): DesktopApi {
       discard: async () => {},
     },
     recovery: {
-      scan: async () => [],
+      scan: async () => fixtureState === 'recovery-dialog'
+        ? [{ meetingId: 'recover-startup', createdAt: now, durationMs: 184_000, byteCount: 8_388_608, kind: 'recoverable' as const }]
+        : [],
       recover: async () => ({ totalBytes: 0, durationMs: 0, warn: false, rolledToPartIndex: null, activePartIndex: 0, nextChunkIndex: 0 }),
       suspend: async () => {},
       keepAsFile: async () => {},

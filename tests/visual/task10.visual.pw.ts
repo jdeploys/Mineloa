@@ -33,6 +33,81 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 }
 
+async function expectFirstPairOrientation(page: Page, selector: string, orientation: 'row' | 'column') {
+  const items = page.locator(selector)
+  await expect(items.first()).toBeVisible()
+  await expect(items.nth(1)).toBeVisible()
+
+  const pair = await items.evaluateAll((elements) => elements.slice(0, 2).map((element) => {
+    const rect = element.getBoundingClientRect()
+    return { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left }
+  }))
+  const [first, second] = pair
+  if (first === undefined || second === undefined) throw new Error(`Expected two visible elements for ${selector}`)
+
+  if (orientation === 'column') {
+    expect(second.top).toBeGreaterThanOrEqual(first.bottom - 1)
+    expect(Math.abs(second.left - first.left)).toBeLessThanOrEqual(1)
+    return
+  }
+
+  expect(Math.abs(second.top - first.top)).toBeLessThanOrEqual(1)
+  expect(second.left).toBeGreaterThanOrEqual(first.right - 1)
+}
+
+async function expectNavigationTreatment(page: Page, compact: boolean) {
+  const geometry = await page.locator('.topbar').evaluate((topbar) => {
+    const nav = topbar.querySelector<HTMLElement>('.app-nav')
+    const button = nav?.querySelector<HTMLElement>('button')
+    if (nav === null || nav === undefined || button === null || button === undefined) {
+      throw new Error('AppShell navigation must render inside the topbar')
+    }
+
+    return {
+      position: getComputedStyle(topbar).position,
+      navWrap: getComputedStyle(nav).flexWrap,
+      buttonMinHeight: getComputedStyle(button).minHeight,
+      buttonHeight: button.getBoundingClientRect().height,
+    }
+  })
+
+  if (compact) {
+    expect(geometry).toMatchObject({ position: 'static', navWrap: 'wrap', buttonMinHeight: '36px' })
+    expect(geometry.buttonHeight).toBeLessThanOrEqual(40)
+    return
+  }
+
+  expect(geometry).toMatchObject({ position: 'sticky', navWrap: 'nowrap', buttonMinHeight: '48px' })
+  expect(geometry.buttonHeight).toBeGreaterThanOrEqual(48)
+}
+
+async function expectRouteLayouts(page: Page, width: number, compact: boolean) {
+  const orientation = compact ? 'column' : 'row'
+
+  await openRoute(page, 'idle')
+  await expectNavigationTreatment(page, compact)
+  await expectFirstPairOrientation(page, '.dashboard.page-container > section', orientation)
+  await expectNoHorizontalOverflow(page)
+  await expect(page).toHaveScreenshot(`responsive-${compact ? 'compact' : 'noncompact'}-${width}.png`, {
+    animations: 'disabled',
+    fullPage: false,
+    omitBackground: false,
+  })
+
+  await openRoute(page, 'provider-advanced')
+  await page.getByText('고급 처리 옵션', { exact: true }).click()
+  await expectFirstPairOrientation(page, '.provider-grid > label', orientation)
+  await expectNoHorizontalOverflow(page)
+
+  await openRoute(page, 'completed')
+  await expectFirstPairOrientation(page, '.transcript-row:first-child > *', orientation)
+  await expectNoHorizontalOverflow(page)
+
+  await openRoute(page, 'recovery-dialog')
+  await expectFirstPairOrientation(page, '.recovery-metrics:first-of-type > div', orientation)
+  await expectNoHorizontalOverflow(page)
+}
+
 test('real dashboard light route keeps its heading and primary action in the 1200x800 viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
   await openRoute(page, 'idle', 'light')
@@ -94,5 +169,19 @@ for (const width of [938, 640]) {
     if (width === 640) {
       await expect(page).toHaveScreenshot('dashboard-narrow-640.png', { animations: 'disabled', fullPage: false, omitBackground: false })
     }
+  })
+}
+
+for (const width of [721, 743]) {
+  test(`real App compact seam at ${width}x800 wraps navigation and stacks dashboard, settings, meeting, and recovery without overflow`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await expectRouteLayouts(page, width, true)
+  })
+}
+
+for (const width of [744, 938]) {
+  test(`real App non-compact seam at ${width}x800 keeps desktop navigation and two-column dashboard, settings, meeting, and recovery`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 })
+    await expectRouteLayouts(page, width, false)
   })
 }

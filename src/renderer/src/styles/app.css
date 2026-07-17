@@ -226,7 +226,7 @@
   .dashboard.page-container > section { padding: 24px; }
   .recording-fields { grid-template-columns: 1fr; }
 }
-@media (max-width: 720px) {
+@media (max-width: 743px) {
   .topbar { position: static; min-height: 56px; padding: 10px 16px; gap: 10px; }
   .topbar nav { flex-wrap: wrap; justify-content: flex-end; }
   .topbar nav button { min-height: 36px; }
@@ -258,8 +258,6 @@
   .provider-grid { grid-template-columns: 1fr; }
   .provider-grid label:last-child:nth-child(odd) { grid-column: auto; }
   .model-card { align-items: stretch; flex-direction: column; }
-}
-@media (max-width: 743px) {
   .template-layout { grid-template-columns: minmax(0, 1fr); }
   .template-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .template-master > .ui-button { width: auto; justify-self: start; }
