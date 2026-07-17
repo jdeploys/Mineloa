@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MeetingStatus } from '../../src/shared/contracts/meeting'
@@ -17,6 +17,22 @@ const meeting = (id: string, title: string, status: MeetingStatus): PublicMeetin
 describe('balanced meeting dashboard', () => {
   afterEach(cleanup)
 
+  it('places new meeting before the recent library and exposes one primary start action', async () => {
+    render(<Dashboard
+      meetings={[]}
+      recordingControls={{ start: vi.fn(), stop: vi.fn(), discard: vi.fn() }}
+      onOpenMeeting={vi.fn()}
+      onNavigate={vi.fn()}
+    />)
+
+    const main = await screen.findByRole('main')
+    const headings = within(main).getAllByRole('heading').map((heading) => heading.textContent)
+    expect(headings.slice(0, 2)).toEqual(['새 회의', '최근 기록'])
+    expect(screen.getByRole('button', { name: '녹음 시작' })).toHaveAttribute('data-variant', 'primary')
+    expect(within(main).getByRole('region', { name: '새 회의' })).toHaveClass('surface-card')
+    expect(within(main).getByRole('region', { name: '최근 기록' })).toHaveClass('surface-card')
+  })
+
   it('shows the recording entry and exact recent meeting statuses', () => {
     render(<Dashboard
       meetings={[meeting('done', '제품 회의', 'completed'), meeting('failed', '주간 회의', 'failed')]}
@@ -25,7 +41,7 @@ describe('balanced meeting dashboard', () => {
       onNavigate={vi.fn()}
     />)
 
-    expect(screen.getByRole('button', { name: '녹음 시작' })).toHaveClass('button-primary')
+    expect(screen.getByRole('button', { name: '녹음 시작' })).toHaveAttribute('data-variant', 'primary')
     expect(screen.getByText('completed')).toBeInTheDocument()
     expect(screen.getByText('failed')).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: '주요 메뉴' })).not.toBeInTheDocument()

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { AudioPolicy } from '../../../../shared/contracts/meeting'
 import type { SummaryTemplate, TemplatesApi } from '../../../../shared/contracts/template'
+import { InlineNotice } from '../../components/feedback/InlineNotice'
+import { ActionBar } from '../../components/layout/ActionBar'
+import { Button } from '../../components/ui/Button'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 import {
   RecordingTerminalError,
   type RecordingSnapshot,
@@ -128,69 +132,69 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
   }
 
   return (
-    <section aria-label="회의 녹음">
+    <section className="recording-panel" aria-label="회의 녹음">
       {phase === 'idle' && (
-        <>
-          {templates !== undefined && <label>요약 템플릿 <select aria-label="요약 템플릿" value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>{templateItems.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>}
-          <label>원본 오디오 <select aria-label="원본 오디오" value={audioPolicy} onChange={(event) => setAudioPolicy(event.target.value as AudioPolicy)}><option value="delete_after_processing">처리 후 삭제</option><option value="keep">계속 보관</option></select></label>
-          <button className="button-primary" disabled={busy || (templates !== undefined && templateItems.length === 0)} onClick={() => void start()}>
-            녹음 시작
-          </button>
-        </>
+        <div className="recording-options">
+          <div className="recording-fields">
+            {templates !== undefined && <label>요약 템플릿 <select aria-label="요약 템플릿" value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>{templateItems.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>}
+            <label>원본 오디오 <select aria-label="원본 오디오" value={audioPolicy} onChange={(event) => setAudioPolicy(event.target.value as AudioPolicy)}><option value="delete_after_processing">처리 후 삭제</option><option value="keep">계속 보관</option></select></label>
+          </div>
+          <ActionBar>
+            <Button variant="primary" disabled={busy || (templates !== undefined && templateItems.length === 0)} onClick={() => void start()}>
+              녹음 시작
+            </Button>
+            <Button variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>
+              설정으로 이동
+            </Button>
+          </ActionBar>
+        </div>
       )}
       {phase === 'recording' && (
-        <>
-          <p aria-live="polite">녹음 중</p>
+        <div className="recording-active">
+          <div className="live-status-row" aria-live="polite">
+            <StatusBadge label={snapshot.phase === 'paused' ? '일시정지됨' : '녹음 중'} tone="active" />
+            <span>{snapshot.microphone === 'paused' ? '마이크 일시정지' : snapshot.microphone === 'active' ? '마이크 연결됨' : '마이크 확인 중'}</span>
+          </div>
+          <p className="recording-elapsed" aria-label={`경과 시간 ${formatElapsed(snapshot.durationMs)}`}>{formatElapsed(snapshot.durationMs)}</p>
           <dl className="recording-telemetry">
-            <div><dt>경과 시간</dt><dd>{formatElapsed(snapshot.durationMs)}</dd></div>
             <div><dt>저장 크기</dt><dd>{(snapshot.totalBytes / (1024 * 1024)).toFixed(1)} MiB</dd></div>
             <div><dt>녹음 파트</dt><dd>파트 {Math.max(1, snapshot.partCount)}</dd></div>
+            <div><dt>로컬 저장</dt><dd>{snapshot.localSave === 'saving' ? '로컬 저장 중' : snapshot.localSave === 'saved' ? '로컬 저장 완료' : '로컬 저장 대기'}</dd></div>
           </dl>
-          <p>{snapshot.microphone === 'paused' ? '마이크 일시정지' : snapshot.microphone === 'active' ? '마이크 연결됨' : '마이크 확인 중'}</p>
-          <p>{snapshot.localSave === 'saving' ? '로컬 저장 중' : snapshot.localSave === 'saved' ? '로컬 저장 완료' : '로컬 저장 대기'}</p>
-          {snapshot.warn && <p role="status">22 MiB를 넘어 새 파트 전환을 준비합니다.</p>}
-          {controls.pause !== undefined && controls.resume !== undefined && <button disabled={busy} onClick={() => void togglePause()}>{snapshot.phase === 'paused' ? '재개' : '일시정지'}</button>}
-          <button className="button-primary" disabled={busy} onClick={() => void stop()}>
-            종료
-          </button>
-          <button className="button-danger" disabled={busy} onClick={() => setConfirmingDiscard(true)}>
-            폐기
-          </button>
-        </>
+          {snapshot.warn && <InlineNotice tone="warning" title="파트 전환 준비"><p role="status">22 MiB를 넘어 새 파트 전환을 준비합니다.</p></InlineNotice>}
+          <ActionBar danger={<Button variant="danger" disabled={busy} onClick={() => setConfirmingDiscard(true)}>폐기</Button>}>
+            {controls.pause !== undefined && controls.resume !== undefined && <Button variant="secondary" disabled={busy} onClick={() => void togglePause()}>{snapshot.phase === 'paused' ? '재개' : '일시정지'}</Button>}
+            <Button variant="primary" disabled={busy} onClick={() => void stop()}>종료</Button>
+            <Button variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
+          </ActionBar>
+        </div>
       )}
       {phase === 'stop_pending' && (
-        <>
-          <p aria-live="polite">녹음은 중지되었지만 저장 완료를 기다리고 있습니다.</p>
-          {terminalFailure === 'capture_failed' ? (
-            <button disabled={busy} onClick={() => setConfirmingDiscard(true)}>
-              폐기
-            </button>
-          ) : (
-            <button disabled={busy} onClick={() => void stop()}>
-              종료 재시도
-            </button>
-          )}
-        </>
+        <div className="recording-pending">
+          <InlineNotice tone="warning" title="저장 완료 대기"><p aria-live="polite">녹음은 중지되었지만 저장 완료를 기다리고 있습니다.</p></InlineNotice>
+          <ActionBar danger={terminalFailure === 'capture_failed' ? <Button variant="danger" disabled={busy} onClick={() => setConfirmingDiscard(true)}>폐기</Button> : undefined}>
+            {terminalFailure !== 'capture_failed' && <Button variant="primary" disabled={busy} onClick={() => void stop()}>종료 재시도</Button>}
+            <Button variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
+          </ActionBar>
+        </div>
       )}
       {phase === 'discard_pending' && (
-        <>
-          <p aria-live="polite">녹음은 중지되었지만 폐기를 완료하지 못했습니다.</p>
-          <button disabled={busy} onClick={() => void discard()}>
-            폐기 재시도
-          </button>
-        </>
+        <div className="recording-pending">
+          <InlineNotice tone="error" title="폐기 실패"><p aria-live="polite">녹음은 중지되었지만 폐기를 완료하지 못했습니다.</p></InlineNotice>
+          <ActionBar danger={<Button variant="danger" disabled={busy} onClick={() => void discard()}>폐기 재시도</Button>}>
+            <Button variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
+          </ActionBar>
+        </div>
       )}
-      <button data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>
-        설정으로 이동
-      </button>
-      {error !== null && <p role="alert">{error}</p>}
+      {error !== null && <InlineNotice tone="error" title="녹음 작업 실패"><p>{error}</p></InlineNotice>}
       {confirmingDiscard && (
-        <div role="dialog" aria-modal="true" aria-label="녹음 폐기">
-          <p>현재 녹음과 저장된 청크를 모두 폐기할까요?</p>
-          <button onClick={() => setConfirmingDiscard(false)}>취소</button>
-          <button disabled={busy} onClick={() => void discard()}>
-            녹음 폐기 확인
-          </button>
+        <div className="dialog-scrim">
+          <div className="dialog-panel dialog-panel-compact" role="dialog" aria-modal="true" aria-label="녹음 폐기">
+            <header className="dialog-heading"><h2>녹음을 폐기할까요?</h2><p>현재 녹음과 저장된 청크를 모두 폐기합니다.</p></header>
+            <ActionBar danger={<Button variant="danger" disabled={busy} onClick={() => void discard()}>녹음 폐기 확인</Button>}>
+              <Button variant="secondary" onClick={() => setConfirmingDiscard(false)}>취소</Button>
+            </ActionBar>
+          </div>
         </div>
       )}
     </section>

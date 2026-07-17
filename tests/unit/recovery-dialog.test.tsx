@@ -40,10 +40,12 @@ describe('RecoveryDialog', () => {
     const recovery = { recover: vi.fn(), keepAsFile: vi.fn(), discard: vi.fn(async () => undefined) }
     render(<RecoveryDialog items={[item]} recovery={recovery} onResolved={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: '폐기' })).toHaveAttribute('data-destructive', 'true')
-    expect(screen.getByRole('button', { name: '폐기' })).toHaveStyle({ backgroundColor: '#b42318', color: '#ffffff' })
-    expect(screen.getByRole('button', { name: '복구' })).not.toHaveAttribute('data-destructive')
+    expect(screen.getByRole('button', { name: '폐기' })).toHaveAttribute('data-variant', 'danger')
+    expect(screen.getByRole('button', { name: '폐기' })).not.toHaveAttribute('style')
+    expect(screen.getByRole('button', { name: '복구' })).toHaveAttribute('data-variant', 'primary')
+    expect(screen.getByRole('dialog', { name: '중단된 녹음 복구' }).parentElement).toHaveClass('dialog-scrim')
     await user.click(screen.getByRole('button', { name: '폐기' }))
+    expect(screen.getByRole('alertdialog', { name: '복구 녹음 영구 폐기' })).toHaveClass('dialog-panel')
     expect(screen.getByRole('button', { name: '복구' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '현재 파일로 보관' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '폐기' })).toBeDisabled()

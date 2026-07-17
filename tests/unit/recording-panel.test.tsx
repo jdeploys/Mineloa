@@ -1,14 +1,48 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RecordingPanel } from '../../src/renderer/src/features/recording/RecordingPanel'
-import { RecordingTerminalError } from '../../src/renderer/src/features/recording/mediaRecorderController'
+import {
+  RecordingTerminalError,
+  type RecordingSnapshot,
+} from '../../src/renderer/src/features/recording/mediaRecorderController'
 
 describe('RecordingPanel', () => {
   afterEach(cleanup)
+
+  it('keeps pause, stop and explicit discard confirmation semantics', async () => {
+    const user = userEvent.setup()
+    let listener: ((snapshot: RecordingSnapshot) => void) | undefined
+    const controls = {
+      start: vi.fn(async () => undefined),
+      stop: vi.fn(async () => undefined),
+      discard: vi.fn(async () => undefined),
+      pause: vi.fn(async () => undefined),
+      resume: vi.fn(async () => undefined),
+      subscribe: vi.fn((next: (snapshot: RecordingSnapshot) => void) => {
+        listener = next
+        return () => undefined
+      }),
+    }
+    render(<RecordingPanel controls={controls} onNavigate={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: '녹음 시작' }))
+    act(() => listener?.({
+      phase: 'recording', meetingId: 'm1', durationMs: 1_000, totalBytes: 1_024,
+      warn: false, activePartIndex: 0, partCount: 1, microphone: 'active', localSave: 'saving',
+    }))
+    await user.click(screen.getByRole('button', { name: '일시정지' }))
+    expect(controls.pause).toHaveBeenCalledTimes(1)
+    expect(controls.stop).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '폐기' }))
+    expect(controls.discard).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '녹음 폐기 확인' }))
+    expect(controls.discard).toHaveBeenCalledTimes(1)
+  })
 
   it('commits on stop while navigation preserves the recording', async () => {
     const user = userEvent.setup()
