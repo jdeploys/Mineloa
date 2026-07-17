@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parsePackageVerificationRequest } from '../../src/main/app/packageVerification'
+import { hasTask10VisualBaseline } from '../visual/platformSupport'
 
 describe('package verification boundary', () => {
   it('enables verification only for an explicit absolute result path', () => {
@@ -149,15 +150,32 @@ describe('release package configuration', () => {
     expect(readFileSync(resolve('.github/workflows/ci.yml'), 'utf8')).not.toContain('--update-snapshots')
   })
 
-  it('compares reviewed mac baselines during release and records updates only manually', () => {
-    const release = readFileSync(resolve('.github/workflows/release.yml'), 'utf8')
+  it('records the complete current Darwin visual suite through the least-privileged manual macOS 15 workflow', () => {
     const recorder = readFileSync(resolve('.github/workflows/record-macos-visual-baselines.yml'), 'utf8')
-    expect(release).toContain('processing-settings.visual.pw.ts')
-    expect(release).not.toContain('--update-snapshots')
+      .replace(/\r\n/g, '\n')
+
     expect(recorder).toContain('workflow_dispatch:')
-    expect(recorder).toContain('--update-snapshots')
-    expect(recorder).toContain('tests/visual/snapshots/darwin/processing-*.png')
+    expect(recorder).toContain('permissions:\n  contents: read')
+    expect(recorder).toContain('runs-on: macos-15')
+    expect(manifest.scripts['test:visual:update']).toBe('playwright test tests/visual --update-snapshots')
+    expect(recorder).toContain('run: npm run test:visual:update -- --reporter=line,html')
+    expect(recorder).toContain('tests/visual/snapshots/darwin/**')
+    expect(recorder).toContain('test-results/')
+    expect(recorder).toContain('playwright-report/')
+    expect(recorder).toContain('if-no-files-found: error')
+    expect(recorder).not.toContain('processing-settings.visual.pw.ts')
     expect(recorder).not.toMatch(/uses:\s+[^\s]+@(?![a-f0-9]{40}(?:\s+#|\s*$))/m)
+  })
+
+  it('keeps CI and release visual comparisons read-only while Darwin remains supported', () => {
+    const ci = readFileSync(resolve('.github/workflows/ci.yml'), 'utf8')
+    const release = readFileSync(resolve('.github/workflows/release.yml'), 'utf8')
+
+    expect(ci).toContain('run: npm run test:visual')
+    expect(release).toContain('processing-settings.visual.pw.ts')
+    expect(ci).not.toContain('--update-snapshots')
+    expect(release).not.toContain('--update-snapshots')
+    expect(hasTask10VisualBaseline('darwin')).toBe(true)
   })
 
   it('separates hardened Developer ID signing from ad-hoc fallback', () => {
