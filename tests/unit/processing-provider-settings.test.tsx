@@ -66,6 +66,7 @@ describe('processing provider settings visible outcomes', () => {
     render(<ProcessingProviderSettingsView settings={settingsApi()} />)
     await screen.findByLabelText('전사 방식')
     const disclosure = screen.getByText('고급 처리 옵션')
+    expect(disclosure.closest('summary')?.querySelector('.ui-icon')).toBeVisible()
     expect(disclosure.closest('details')).not.toHaveAttribute('open')
     expect(screen.getByLabelText('전사 방식')).toHaveValue('openai')
     expect(screen.getByLabelText('요약 방식')).toHaveValue('openai')
@@ -116,6 +117,7 @@ describe('processing provider settings visible outcomes', () => {
     await userEvent.setup().selectOptions(screen.getByLabelText('전사 방식'), 'local_whisper')
     const remove = await screen.findByRole('button', { name: 'base 모델 삭제' })
     expect(remove).toBeVisible()
+    expect(remove.querySelector('.ui-icon')).toBeVisible()
     expect(document.body.textContent).not.toMatch(/[A-Z]:\\|\/Users\//)
   })
 
@@ -219,6 +221,7 @@ describe('processing provider settings visible outcomes', () => {
     await screen.findByText('Codex CLI 설정이 올바르지 않습니다. 터미널에서 설정을 확인한 뒤 다시 시도하세요.')
 
     const refreshButton = screen.getByRole('button', { name: 'Codex CLI 상태 다시 확인' })
+    expect(refreshButton.querySelector('.ui-icon')).toBeVisible()
     refreshButton.focus()
     await user.keyboard('{Enter}')
 

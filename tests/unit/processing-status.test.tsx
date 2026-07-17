@@ -24,6 +24,7 @@ describe('ProcessingStatus', () => {
     expect(screen.getByText('요약 실패')).toBeInTheDocument()
     expect(screen.getByText('원본 오디오 불필요')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '요약 다시 시도' })).toHaveAttribute('data-variant', 'primary')
+    expect(screen.getByRole('button', { name: '요약 다시 시도' }).querySelector('.ui-icon')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: '요약 다시 시도' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('offline')
     fireEvent.click(screen.getByRole('button', { name: '요약 다시 시도' }))

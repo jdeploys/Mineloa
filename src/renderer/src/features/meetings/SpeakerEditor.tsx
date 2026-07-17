@@ -30,7 +30,7 @@ export function SpeakerEditor({
       <label htmlFor={`speaker-${speaker.id}`}>{speaker.displayName} 이름</label>
       <div>
         <input id={`speaker-${speaker.id}`} value={names[speaker.id] ?? ''} onChange={(event) => setNames((current) => ({ ...current, [speaker.id]: event.target.value }))} />
-        <Button variant="primary" disabled={pendingId !== null} onClick={() => void save(speaker)}>{speaker.displayName} 이름 저장</Button>
+        <Button icon="save" variant="primary" disabled={pendingId !== null} onClick={() => void save(speaker)}>{speaker.displayName} 이름 저장</Button>
       </div>
     </div>)}
     {error && <p role="alert">{error}</p>}

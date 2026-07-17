@@ -23,6 +23,7 @@ import {
   Save,
   Settings2,
   Square,
+  SunMoon,
   Terminal,
   Trash2,
   TriangleAlert,
@@ -35,7 +36,7 @@ export type IconName =
   | 'microphone' | 'recording' | 'pause' | 'play' | 'stop'
   | 'save' | 'delete' | 'download' | 'export' | 'retry'
   | 'up' | 'down' | 'forward' | 'success' | 'warning' | 'error' | 'processing'
-  | 'add' | 'edit' | 'key' | 'model' | 'terminal' | 'close'
+  | 'add' | 'edit' | 'key' | 'model' | 'terminal' | 'appearance' | 'close'
 
 const icons: Record<IconName, LucideIcon> = {
   library: Library,
@@ -65,6 +66,7 @@ const icons: Record<IconName, LucideIcon> = {
   key: KeyRound,
   model: BrainCircuit,
   terminal: Terminal,
+  appearance: SunMoon,
   close: X,
 }
 

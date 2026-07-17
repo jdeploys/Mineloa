@@ -63,7 +63,7 @@ export function ProcessingStatus({ meetingId, processing, initialStatus, onStatu
         <span>{status.audioRequired ? '원본 오디오 필요' : '원본 오디오 불필요'}</span>
         {status.error && <span>{status.error.message}</span>}
       </div>
-      {status.state !== 'completed' && <Button variant="primary" disabled={active || (status.failedStage !== null && !status.retryable)} onClick={() => void submit()}>
+      {status.state !== 'completed' && <Button icon={active ? 'processing' : status.failedStage === null ? 'play' : 'retry'} variant="primary" disabled={active || (status.failedStage !== null && !status.retryable)} onClick={() => void submit()}>
         {active ? '처리 중' : action}
       </Button>}
     </div>

@@ -39,6 +39,7 @@ describe('theme preference', () => {
   it('keeps system selected while offering manual theme choices', () => {
     const onChange = vi.fn()
     render(<AppearanceSettings preference="system" onChange={onChange} />)
+    expect(screen.getByRole('heading', { name: '화면 테마' }).parentElement?.querySelector('.ui-icon')).toBeVisible()
 
     expect(screen.getByRole('radio', { name: '시스템 설정' })).toBeChecked()
     fireEvent.click(screen.getByRole('radio', { name: '다크' }))

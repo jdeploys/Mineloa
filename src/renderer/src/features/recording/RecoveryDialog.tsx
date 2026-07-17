@@ -85,20 +85,20 @@ export function RecoveryDialog({ items, recovery, onResolved, onRecover, recover
             <section className="recovery-item" key={item.meetingId} aria-label={`중단된 녹음 ${item.meetingId}`}>
               <header className="recovery-item-heading">
                 <div><strong>저장된 녹음</strong><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time></div>
-                <StatusBadge label={recoveryLabel(item.kind)} tone={item.kind === 'recoverable' ? 'success' : 'warning'} />
+                <StatusBadge label={recoveryLabel(item.kind)} tone={item.kind === 'recoverable' ? 'success' : 'warning'} icon={item.kind === 'recoverable' ? 'success' : 'warning'} />
               </header>
               <dl className="recovery-metrics">
                 <div><dt>녹음 길이</dt><dd>{formatDuration(item.durationMs)}</dd></div>
                 <div><dt>저장 크기</dt><dd>{formatBytes(item.byteCount)}</dd></div>
               </dl>
               {item.kind === 'exportOnly' && <InlineNotice tone="warning" title="복구 정보 손상"><p>매니페스트를 읽을 수 없어 원본 바이트는 내보내기 전용으로 보존됩니다.</p></InlineNotice>}
-              <ActionBar danger={<Button variant="danger" disabled={busy || confirming !== null} onClick={() => setConfirming(item.meetingId)}>폐기</Button>}>
+              <ActionBar danger={<Button icon="delete" variant="danger" disabled={busy || confirming !== null} onClick={() => setConfirming(item.meetingId)}>폐기</Button>}>
                 {item.kind === 'exportOnly' ? (
-                  <Button variant="primary" disabled={busy || confirming !== null} onClick={() => void exportBytes(item.meetingId)}>보존 바이트 내보내기</Button>
+                  <Button icon="export" variant="primary" disabled={busy || confirming !== null} onClick={() => void exportBytes(item.meetingId)}>보존 바이트 내보내기</Button>
                 ) : (
                   <>
-                    {item.kind === 'recoverable' && <Button variant="primary" disabled={recoverDisabled || busy || confirming !== null} onClick={() => void decide(item.meetingId, 'recover')}>복구</Button>}
-                    <Button variant="secondary" disabled={busy || confirming !== null} onClick={() => void decide(item.meetingId, 'keep')}>현재 파일로 보관</Button>
+                    {item.kind === 'recoverable' && <Button icon="retry" variant="primary" disabled={recoverDisabled || busy || confirming !== null} onClick={() => void decide(item.meetingId, 'recover')}>복구</Button>}
+                    <Button icon="save" variant="secondary" disabled={busy || confirming !== null} onClick={() => void decide(item.meetingId, 'keep')}>현재 파일로 보관</Button>
                   </>
                 )}
               </ActionBar>
@@ -110,8 +110,8 @@ export function RecoveryDialog({ items, recovery, onResolved, onRecover, recover
           <div className="dialog-scrim dialog-scrim-nested">
             <div className="dialog-panel dialog-panel-compact" role="alertdialog" aria-modal="true" aria-label="복구 녹음 영구 폐기">
               <header className="dialog-heading"><h2>영구 폐기할까요?</h2><p>보존된 녹음 바이트를 영구적으로 폐기합니다.</p></header>
-              <ActionBar danger={<Button variant="danger" disabled={busy} onClick={() => void decide(confirming, 'discard')}>영구 폐기 확인</Button>}>
-                <Button variant="secondary" disabled={busy} onClick={() => setConfirming(null)}>취소</Button>
+              <ActionBar danger={<Button icon="delete" variant="danger" disabled={busy} onClick={() => void decide(confirming, 'discard')}>영구 폐기 확인</Button>}>
+                <Button icon="close" variant="secondary" disabled={busy} onClick={() => setConfirming(null)}>취소</Button>
               </ActionBar>
             </div>
           </div>

@@ -209,6 +209,10 @@ describe('TemplateEditor', () => {
     expect(screen.getByRole('button', { name: '섹션 추가' })).toBeVisible()
     expect(screen.getByRole('button', { name: '템플릿 저장' })).toBeVisible()
     expect(screen.getByRole('button', { name: '템플릿 삭제' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '섹션 추가' }).querySelector('.ui-icon')).toBeVisible()
+    expect(screen.getByRole('button', { name: '템플릿 저장' }).querySelector('.ui-icon')).toBeVisible()
+    expect(screen.getByRole('button', { name: '템플릿 삭제' }).querySelector('.ui-icon')).toBeVisible()
+    expect(screen.getAllByRole('button', { name: '위로 이동' })[0]?.querySelector('.ui-icon')).toBeVisible()
   })
 
   it('reorders editable template sections without saving the rest of the form', async () => {

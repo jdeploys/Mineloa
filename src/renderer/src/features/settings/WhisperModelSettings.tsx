@@ -96,8 +96,8 @@ export function WhisperModelSettings({
         <p>{status === null ? '상태 확인 중' : installed ? `설치됨 · ${formatBytes(status.expectedBytes)}` : `설치 필요 · ${formatBytes(status.expectedBytes)}`}</p>
       </div>
       {installed
-        ? <Button variant="danger" type="button" disabled={busy} onClick={() => void runAction(settings.deleteWhisperModel)}>{modelNames[modelId]} 모델 삭제</Button>
-        : <Button variant="primary" type="button" disabled={busy || status === null || status.state === 'downloading'} onClick={() => void runAction(settings.downloadWhisperModel)}>{status?.state === 'downloading' ? '다운로드 중' : `${modelNames[modelId]} 모델 다운로드`}</Button>}
+        ? <Button icon="delete" variant="danger" type="button" disabled={busy} onClick={() => void runAction(settings.deleteWhisperModel)}>{modelNames[modelId]} 모델 삭제</Button>
+        : <Button icon={status?.state === 'downloading' ? 'processing' : 'download'} variant="primary" type="button" disabled={busy || status === null || status.state === 'downloading'} onClick={() => void runAction(settings.downloadWhisperModel)}>{status?.state === 'downloading' ? '다운로드 중' : `${modelNames[modelId]} 모델 다운로드`}</Button>}
     </div>
     {activeProgress !== null && <div className="model-progress">
       <div><span>다운로드 중</span><span>{Math.round((activeProgress.receivedBytes / activeProgress.totalBytes) * 100)}%</span></div>

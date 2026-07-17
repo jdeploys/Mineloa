@@ -6,6 +6,7 @@ import type {
 } from '../../../../shared/contracts/settings'
 import { PrivacyNotice } from '../../components/help/PrivacyNotice'
 import { FieldHelp } from '../../components/help/FieldHelp'
+import { Icon } from '../../components/ui/Icon'
 import { CodexCliStatus } from './CodexCliStatus'
 import { WhisperModelSettings } from './WhisperModelSettings'
 
@@ -82,7 +83,7 @@ export function ProcessingProviderSettings({ settings }: { settings: SettingsApi
   const refreshCodexStatus = () => runOperation('codex_refresh', refreshDescriptors)
 
   if (value === null) return <section className="processing-settings" aria-label="처리 방식 설정">
-    <div className="settings-heading"><div><p className="eyebrow">PROCESSING</p><h2>고급 처리 옵션</h2></div></div>
+    <div className="settings-heading"><div><p className="eyebrow">PROCESSING</p><h2><Icon name="model" />고급 처리 옵션</h2></div></div>
     {error !== null ? <p role="alert" className="settings-alert">{error}</p> : <p className="settings-meta">처리 설정을 불러오는 중입니다.</p>}
   </section>
 
@@ -97,7 +98,7 @@ export function ProcessingProviderSettings({ settings }: { settings: SettingsApi
   return <section className="processing-settings" aria-label="처리 방식 설정">
     <details className="advanced-settings">
       <summary>
-        <span><span className="eyebrow">ADVANCED</span><strong>고급 처리 옵션</strong></span>
+        <span><span className="eyebrow">ADVANCED</span><strong><Icon name="model" />고급 처리 옵션</strong></span>
         <span className="advanced-summary">{transcription?.displayName ?? value.transcriptionProvider} · {summary?.displayName ?? value.summaryProvider}</span>
       </summary>
       <div className="advanced-settings-content">

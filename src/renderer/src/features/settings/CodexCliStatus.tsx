@@ -44,7 +44,7 @@ export function CodexCliStatus({ descriptor, onAvailabilityChanged, pending, dis
     <TroubleshootingDisclosure
       title="Codex CLI 문제 해결"
       steps={steps?.map((step) => step.startsWith('codex ') || step.startsWith('npm ') ? <code>{step}</code> : step) ?? null}
-      action={steps === null ? undefined : <Button type="button" disabled={disabled} onClick={() => void onAvailabilityChanged()} aria-label={pending ? 'Codex CLI 상태 확인 중…' : 'Codex CLI 상태 다시 확인'}>{pending ? '확인 중…' : '다시 확인'}</Button>}
+      action={steps === null ? undefined : <Button icon={pending ? 'processing' : 'retry'} type="button" disabled={disabled} onClick={() => void onAvailabilityChanged()} aria-label={pending ? 'Codex CLI 상태 확인 중…' : 'Codex CLI 상태 다시 확인'}>{pending ? '확인 중…' : '다시 확인'}</Button>}
     />
   </section>
 }

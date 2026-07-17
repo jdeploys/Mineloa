@@ -51,6 +51,9 @@ describe('single-document meeting detail', () => {
       exportMarkdown: vi.fn(async () => ({ status: 'success' as const })), importMeeting: vi.fn(),
     }
     render(<MeetingDetail document={source} initialProcessingStatus={{ meetingId: 'meeting-1', state: 'failed', failedStage: 'summarizing', retryable: true, audioRequired: false, error: { code: 'OPENAI_NETWORK', message: 'retry' } }} processing={processing} archive={archive} onRefresh={vi.fn()} onBack={vi.fn()} onRenameSpeaker={rename} />)
+    for (const name of ['요약 다시 시도', '화자 B 이름 저장', '.nnote 내보내기', 'Markdown 내보내기']) {
+      expect(screen.getByRole('button', { name }).querySelector('.ui-icon')).toBeVisible()
+    }
     await user.click(screen.getByRole('button', { name: '요약 다시 시도' }))
     await user.clear(screen.getByLabelText('화자 B 이름'))
     await user.type(screen.getByLabelText('화자 B 이름'), '민지')

@@ -116,10 +116,13 @@ describe('API key settings', () => {
     render(<ApiKeySettings settings={settings} />)
 
     expect(await screen.findByRole('region', { name: 'API 키 설정' })).toHaveClass('settings-panel')
+    expect(screen.getByRole('heading', { name: 'API 키 설정' }).parentElement?.querySelector('.ui-icon')).toBeVisible()
     expect(screen.getByText('설정되지 않음')).toBeInTheDocument()
     expect(screen.getByLabelText('OpenAI API 키')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'API 키 저장' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'API 키 삭제' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'API 키 저장' }).querySelector('.ui-icon')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'API 키 삭제' }).querySelector('.ui-icon')).toBeVisible()
   })
 
   it('separates the credential card from the API key danger zone', async () => {

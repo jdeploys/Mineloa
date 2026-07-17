@@ -9,6 +9,7 @@ import { PageHeader } from '../../components/layout/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { SurfaceCard } from '../../components/ui/SurfaceCard'
+import type { IconName } from '../../components/ui/Icon'
 import { SpeakerEditor } from './SpeakerEditor'
 import { Transcript } from './Transcript'
 import { ProcessingStatus } from './ProcessingStatus'
@@ -52,6 +53,13 @@ function meetingStatusTone(status: MeetingDocument['meeting']['status']): 'succe
   if (status === 'completed' || status === 'recorded') return 'success'
   if (status === 'failed') return 'danger'
   if (status === 'recording') return 'active'
+  return 'warning'
+}
+
+function meetingStatusIcon(status: MeetingDocument['meeting']['status']): IconName {
+  if (status === 'completed' || status === 'recorded') return 'success'
+  if (status === 'failed') return 'error'
+  if (status === 'recording') return 'recording'
   return 'warning'
 }
 
@@ -113,14 +121,14 @@ export function MeetingDetail({ document, onBack, onRenameSpeaker, headingRef, p
   const formattedMeta = `${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' }).format(new Date(document.meeting.createdAt))} · ${formatDuration(document.meeting.durationMs)}`
 
   return <main className="page-container meeting-page">
-    <PageHeader ref={headingRef} backLabel="전체 기록" onBack={onBack} title={document.meeting.title} description={formattedMeta} trailing={<StatusBadge label={document.meeting.status} tone={meetingStatusTone(document.meeting.status)} />} />
+    <PageHeader ref={headingRef} backLabel="전체 기록" onBack={onBack} title={document.meeting.title} description={formattedMeta} trailing={<StatusBadge label={document.meeting.status} tone={meetingStatusTone(document.meeting.status)} icon={meetingStatusIcon(document.meeting.status)} />} />
     <SurfaceCard className="meeting-overview" labelledBy="meeting-audio-title">
       <h2 id="meeting-audio-title">오디오 및 처리</h2>
       <div className="audio-parts">
         {audioParts.length === 0 ? <p className="muted">보존된 원본 오디오가 없습니다.</p> : audioParts.map((part) => <div className="audio-part" key={part.partIndex}><span>오디오 파트 {part.partIndex + 1}</span><audio aria-label={audioParts.length === 1 ? '회의 오디오' : `회의 오디오 파트 ${part.partIndex + 1}`} controls preload="metadata" src={part.url} /></div>)}
       </div>
       {processing === undefined || initialProcessingStatus === undefined ? null : <ProcessingStatus meetingId={document.meeting.id} processing={processing} initialStatus={initialProcessingStatus} onStatusChange={(status) => { if (status.state === 'completed' || status.state === 'failed' || status.state === 'cleanup_failed') void onRefresh?.() }} />}
-      {archive === undefined ? null : <ActionBar><Button onClick={() => void exportDocument('nnote')}>.nnote 내보내기</Button><Button variant="tertiary" onClick={() => void exportDocument('markdown')}>Markdown 내보내기</Button></ActionBar>}
+      {archive === undefined ? null : <ActionBar><Button icon="export" onClick={() => void exportDocument('nnote')}>.nnote 내보내기</Button><Button icon="download" variant="tertiary" onClick={() => void exportDocument('markdown')}>Markdown 내보내기</Button></ActionBar>}
       {archiveMessage === null ? null : <InlineNotice tone={archiveMessage.tone} title="내보내기 결과"><p role="status">{archiveMessage.message}</p></InlineNotice>}
     </SurfaceCard>
     <article className="meeting-document" aria-label="회의 문서">

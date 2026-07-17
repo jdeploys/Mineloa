@@ -156,7 +156,7 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
           onClick={() => setSelectedId(template.id)}
         >{template.name}</Button>)}
       </nav>
-      <Button type="button" disabled={busy} onClick={createTemplate}>{pendingOperation?.kind === 'create' ? '생성 중…' : '새 템플릿'}</Button>
+      <Button icon="add" type="button" disabled={busy} onClick={createTemplate}>{pendingOperation?.kind === 'create' ? '생성 중…' : '새 템플릿'}</Button>
     </SurfaceCard>
 
     <div className="template-detail">
@@ -194,9 +194,9 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
                 const moving = pendingOperation?.kind === 'reorder' && pendingOperation.sectionId === section.id && pendingOperation.direction === direction
                 const edge = direction === -1 ? index === 0 : index === sections.length - 1
                 const label = direction === -1 ? '위로 이동' : '아래로 이동'
-                return <Button key={direction} type="button" variant="tertiary" aria-label={moving ? '정렬 중…' : label} disabled={busy || edge} onClick={() => moveSection(index, direction)}>{moving ? '정렬 중…' : direction === -1 ? '위로' : '아래로'}</Button>
+                return <Button key={direction} icon={direction === -1 ? 'up' : 'down'} type="button" variant="tertiary" aria-label={moving ? '정렬 중…' : label} title={moving ? undefined : label} disabled={busy || edge} onClick={() => moveSection(index, direction)}>{moving ? '정렬 중…' : <span className="visually-hidden">{label}</span>}</Button>
               })}
-              <Button type="button" variant="tertiary" aria-label="섹션 제거" disabled={busy || sections.length <= 1} onClick={() => removeSection(index)}>제거</Button>
+              <Button icon="delete" type="button" variant="tertiary" aria-label="섹션 제거" disabled={busy || sections.length <= 1} onClick={() => removeSection(index)}>제거</Button>
             </div>
           </div>
           <div className="template-section-fields">
@@ -217,8 +217,8 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
         </li>)}</ol>
 
         <ActionBar>
-          <Button type="button" disabled={busy || sections.length >= 8} onClick={addSection}>섹션 추가</Button>
-          <Button type="button" variant="primary" disabled={busy} onClick={() => void saveTemplate()}>{pendingOperation?.kind === 'save' ? '저장 중…' : '템플릿 저장'}</Button>
+          <Button icon="add" type="button" disabled={busy || sections.length >= 8} onClick={addSection}>섹션 추가</Button>
+          <Button icon="save" type="button" variant="primary" disabled={busy} onClick={() => void saveTemplate()}>{pendingOperation?.kind === 'save' ? '저장 중…' : '템플릿 저장'}</Button>
         </ActionBar>
 
         <div className="danger-zone template-danger-zone">
@@ -226,7 +226,7 @@ export function TemplateEditor({ templates: api }: TemplateEditorProps) {
             <strong>템플릿 삭제</strong>
             <p>이 템플릿을 목록에서 영구적으로 삭제합니다.</p>
           </div>
-          <Button type="button" variant="danger" disabled={busy} onClick={() => void deleteTemplate()}>{pendingOperation?.kind === 'delete' ? '삭제 중…' : '템플릿 삭제'}</Button>
+          <Button icon="delete" type="button" variant="danger" disabled={busy} onClick={() => void deleteTemplate()}>{pendingOperation?.kind === 'delete' ? '삭제 중…' : '템플릿 삭제'}</Button>
         </div>
       </SurfaceCard> : null}
     </div>

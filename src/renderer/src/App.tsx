@@ -6,6 +6,8 @@ import type { ProcessingStatus as ProcessingStatusValue } from '../../shared/con
 import type { AudioPolicy } from '../../shared/contracts/meeting'
 import { AppShell } from './components/layout/AppShell'
 import { PageHeader } from './components/layout/PageHeader'
+import { ActionBar } from './components/layout/ActionBar'
+import { Button } from './components/ui/Button'
 import { Dashboard } from './features/meetings/Dashboard'
 import { MeetingDetail } from './features/meetings/MeetingDetail'
 import {
@@ -200,8 +202,10 @@ export function App({
     <div hidden={screen !== 'all'}>
       {archiveNotice !== null && <div className="document-shell" role="alert">
         <p>{archiveNotice}</p>
-        <button type="button" onClick={() => void importMeeting()}>가져오기 다시 시도</button>
-        <button type="button" onClick={() => setArchiveNotice(null)}>알림 닫기</button>
+        <ActionBar>
+          <Button icon="retry" type="button" onClick={() => void importMeeting()}>가져오기 다시 시도</Button>
+          <Button icon="close" variant="tertiary" type="button" onClick={() => setArchiveNotice(null)}>알림 닫기</Button>
+        </ActionBar>
       </div>}
       <Dashboard meetings={meetings} recordingControls={recordingControls} templates={desktopApi.templates} onOpenMeeting={(id) => void openMeeting(id)} onNavigate={navigate} />
     </div>

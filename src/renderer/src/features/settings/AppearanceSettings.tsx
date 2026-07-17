@@ -1,4 +1,5 @@
 import type { ThemePreference } from '../../hooks/useThemePreference'
+import { Icon } from '../../components/ui/Icon'
 
 interface AppearanceSettingsProps {
   preference: ThemePreference
@@ -22,7 +23,7 @@ export function AppearanceSettings({
     >
       <div>
         <p className="eyebrow">APPEARANCE</p>
-        <h2 id="appearance-title">화면 테마</h2>
+        <h2 id="appearance-title"><Icon name="appearance" />화면 테마</h2>
       </div>
       <fieldset className="theme-options">
         <legend>테마 선택</legend>

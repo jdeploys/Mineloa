@@ -4,6 +4,7 @@ import { StatusIndicator } from '../../components/feedback/StatusIndicator'
 import { ActionBar } from '../../components/layout/ActionBar'
 import { Button } from '../../components/ui/Button'
 import { SurfaceCard } from '../../components/ui/SurfaceCard'
+import { Icon } from '../../components/ui/Icon'
 
 interface ApiKeySettingsProps {
   settings: SettingsApi
@@ -87,7 +88,7 @@ export function ApiKeySettings({ settings }: ApiKeySettingsProps) {
   return (
     <section className="settings-panel" aria-labelledby="api-key-settings-title">
       <div className="settings-heading">
-        <div><p className="eyebrow">OPENAI</p><h2 id="api-key-settings-title">API 키 설정</h2></div>
+        <div><p className="eyebrow">OPENAI</p><h2 id="api-key-settings-title"><Icon name="key" />API 키 설정</h2></div>
       </div>
       <SurfaceCard labelledBy="api-key-credential-title" className="credential-card">
         <div className="credential-card-heading">
@@ -107,7 +108,7 @@ export function ApiKeySettings({ settings }: ApiKeySettingsProps) {
             onChange={(event) => setValue(event.target.value)}
           />
           <ActionBar>
-            <Button variant="primary" type="submit" disabled={busy || value.length === 0}>
+            <Button icon="key" variant="primary" type="submit" disabled={busy || value.length === 0}>
               API 키 저장
             </Button>
           </ActionBar>
@@ -117,7 +118,7 @@ export function ApiKeySettings({ settings }: ApiKeySettingsProps) {
       <section className="danger-zone" aria-labelledby="api-key-danger-title">
         <div><strong id="api-key-danger-title">저장된 API 키 삭제</strong><p>이 기기의 보안 저장소에서만 제거합니다.</p></div>
         <ActionBar>
-          <Button variant="danger" type="button" disabled={busy || !status?.configured} onClick={remove}>API 키 삭제</Button>
+          <Button icon="delete" variant="danger" type="button" disabled={busy || !status?.configured} onClick={remove}>API 키 삭제</Button>
         </ActionBar>
       </section>
     </section>
