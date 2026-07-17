@@ -28,7 +28,9 @@ describe('balanced meeting dashboard', () => {
     const main = await screen.findByRole('main')
     const headings = within(main).getAllByRole('heading').map((heading) => heading.textContent)
     expect(headings.slice(0, 2)).toEqual(['새 회의', '최근 기록'])
-    expect(screen.getByRole('button', { name: '녹음 시작' })).toHaveAttribute('data-variant', 'primary')
+    const start = screen.getByRole('button', { name: '녹음 시작' })
+    expect(start).toHaveAttribute('data-variant', 'primary')
+    expect(start.querySelector('.ui-icon')).toBeVisible()
     expect(within(main).getByRole('region', { name: '새 회의' })).toHaveClass('surface-card')
     expect(within(main).getByRole('region', { name: '최근 기록' })).toHaveClass('surface-card')
   })
@@ -58,7 +60,9 @@ describe('balanced meeting dashboard', () => {
       onNavigate={vi.fn()}
     />)
 
-    await user.click(screen.getByRole('button', { name: /제품 회의/ }))
+    const meetingRow = screen.getByRole('button', { name: /제품 회의/ })
+    expect(meetingRow.querySelector('.ui-icon')).toBeVisible()
+    await user.click(meetingRow)
 
     expect(open).toHaveBeenCalledWith('done')
     expect(controls.start).not.toHaveBeenCalled()

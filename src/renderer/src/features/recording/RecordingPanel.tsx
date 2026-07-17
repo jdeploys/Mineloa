@@ -140,10 +140,10 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
             <label>원본 오디오 <select aria-label="원본 오디오" value={audioPolicy} onChange={(event) => setAudioPolicy(event.target.value as AudioPolicy)}><option value="delete_after_processing">처리 후 삭제</option><option value="keep">계속 보관</option></select></label>
           </div>
           <ActionBar>
-            <Button variant="primary" disabled={busy || (templates !== undefined && templateItems.length === 0)} onClick={() => void start()}>
+            <Button icon="microphone" variant="primary" disabled={busy || (templates !== undefined && templateItems.length === 0)} onClick={() => void start()}>
               녹음 시작
             </Button>
-            <Button variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>
+            <Button icon="settings" variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>
               설정으로 이동
             </Button>
           </ActionBar>
@@ -162,27 +162,27 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
             <div><dt>로컬 저장</dt><dd>{snapshot.localSave === 'saving' ? '로컬 저장 중' : snapshot.localSave === 'saved' ? '로컬 저장 완료' : '로컬 저장 대기'}</dd></div>
           </dl>
           {snapshot.warn && <InlineNotice tone="warning" title="파트 전환 준비"><p role="status">22 MiB를 넘어 새 파트 전환을 준비합니다.</p></InlineNotice>}
-          <ActionBar danger={<Button variant="danger" disabled={busy} onClick={() => setConfirmingDiscard(true)}>폐기</Button>}>
-            {controls.pause !== undefined && controls.resume !== undefined && <Button variant="secondary" disabled={busy} onClick={() => void togglePause()}>{snapshot.phase === 'paused' ? '재개' : '일시정지'}</Button>}
-            <Button variant="primary" disabled={busy} onClick={() => void stop()}>종료</Button>
-            <Button variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
+          <ActionBar danger={<Button icon="delete" variant="danger" disabled={busy} onClick={() => setConfirmingDiscard(true)}>폐기</Button>}>
+            {controls.pause !== undefined && controls.resume !== undefined && <Button icon={snapshot.phase === 'paused' ? 'play' : 'pause'} variant="secondary" disabled={busy} onClick={() => void togglePause()}>{snapshot.phase === 'paused' ? '재개' : '일시정지'}</Button>}
+            <Button icon="stop" variant="primary" disabled={busy} onClick={() => void stop()}>종료</Button>
+            <Button icon="settings" variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
           </ActionBar>
         </div>
       )}
       {phase === 'stop_pending' && (
         <div className="recording-pending">
           <InlineNotice tone="warning" title="저장 완료 대기"><p aria-live="polite">녹음은 중지되었지만 저장 완료를 기다리고 있습니다.</p></InlineNotice>
-          <ActionBar danger={terminalFailure === 'capture_failed' ? <Button variant="danger" disabled={busy} onClick={() => setConfirmingDiscard(true)}>폐기</Button> : undefined}>
-            {terminalFailure !== 'capture_failed' && <Button variant="primary" disabled={busy} onClick={() => void stop()}>종료 재시도</Button>}
-            <Button variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
+          <ActionBar danger={terminalFailure === 'capture_failed' ? <Button icon="delete" variant="danger" disabled={busy} onClick={() => setConfirmingDiscard(true)}>폐기</Button> : undefined}>
+            {terminalFailure !== 'capture_failed' && <Button icon="retry" variant="primary" disabled={busy} onClick={() => void stop()}>종료 재시도</Button>}
+            <Button icon="settings" variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
           </ActionBar>
         </div>
       )}
       {phase === 'discard_pending' && (
         <div className="recording-pending">
           <InlineNotice tone="error" title="폐기 실패"><p aria-live="polite">녹음은 중지되었지만 폐기를 완료하지 못했습니다.</p></InlineNotice>
-          <ActionBar danger={<Button variant="danger" disabled={busy} onClick={() => void discard()}>폐기 재시도</Button>}>
-            <Button variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
+          <ActionBar danger={<Button icon="retry" variant="danger" disabled={busy} onClick={() => void discard()}>폐기 재시도</Button>}>
+            <Button icon="settings" variant="tertiary" data-focus-key={settingsFocusKey} disabled={busy} onClick={() => onNavigate('settings')}>설정으로 이동</Button>
           </ActionBar>
         </div>
       )}
@@ -191,8 +191,8 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
         <div className="dialog-scrim">
           <div className="dialog-panel dialog-panel-compact" role="dialog" aria-modal="true" aria-label="녹음 폐기">
             <header className="dialog-heading"><h2>녹음을 폐기할까요?</h2><p>현재 녹음과 저장된 청크를 모두 폐기합니다.</p></header>
-            <ActionBar danger={<Button variant="danger" disabled={busy} onClick={() => void discard()}>녹음 폐기 확인</Button>}>
-              <Button variant="secondary" onClick={() => setConfirmingDiscard(false)}>취소</Button>
+            <ActionBar danger={<Button icon="delete" variant="danger" disabled={busy} onClick={() => void discard()}>녹음 폐기 확인</Button>}>
+              <Button icon="close" variant="secondary" onClick={() => setConfirmingDiscard(false)}>취소</Button>
             </ActionBar>
           </div>
         </div>

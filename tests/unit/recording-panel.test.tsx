@@ -46,12 +46,18 @@ describe('RecordingPanel', () => {
     }
     render(<RecordingPanel controls={controls} onNavigate={vi.fn()} />)
 
-    await user.click(screen.getByRole('button', { name: '녹음 시작' }))
+    const start = screen.getByRole('button', { name: '녹음 시작' })
+    expect(start.querySelector('.ui-icon')).toBeVisible()
+    await user.click(start)
     act(() => listener?.({
       phase: 'recording', meetingId: 'm1', durationMs: 1_000, totalBytes: 1_024,
       warn: false, activePartIndex: 0, partCount: 1, microphone: 'active', localSave: 'saving',
     }))
-    await user.click(screen.getByRole('button', { name: '일시정지' }))
+    const pause = screen.getByRole('button', { name: '일시정지' })
+    expect(pause.querySelector('.ui-icon')).toBeVisible()
+    expect(screen.getByRole('button', { name: '종료' }).querySelector('.ui-icon')).toBeVisible()
+    expect(screen.getByRole('button', { name: '폐기' }).querySelector('.ui-icon')).toBeVisible()
+    await user.click(pause)
     expect(controls.pause).toHaveBeenCalledTimes(1)
     expect(controls.stop).not.toHaveBeenCalled()
 

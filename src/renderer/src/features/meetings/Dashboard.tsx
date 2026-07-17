@@ -3,6 +3,7 @@ import type { TemplatesApi } from '../../../../shared/contracts/template'
 import { EmptyState } from '../../components/feedback/EmptyState'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { SurfaceCard } from '../../components/ui/SurfaceCard'
+import { Icon, type IconName } from '../../components/ui/Icon'
 import { RecordingPanel, type RecordingPanelControls } from '../recording/RecordingPanel'
 
 interface DashboardProps {
@@ -28,6 +29,13 @@ function statusTone(status: PublicMeeting['status']): 'success' | 'warning' | 'd
   if (status === 'completed' || status === 'recorded') return 'success'
   if (status === 'failed') return 'danger'
   if (status === 'recording') return 'active'
+  return 'warning'
+}
+
+function statusIcon(status: PublicMeeting['status']): IconName {
+  if (status === 'completed' || status === 'recorded') return 'success'
+  if (status === 'failed') return 'error'
+  if (status === 'recording') return 'recording'
   return 'warning'
 }
 
@@ -63,7 +71,10 @@ export function Dashboard({ meetings, recordingControls, onOpenMeeting, onNaviga
                   <strong>{meeting.title}</strong>
                   <span>{formatDate(meeting.createdAt)} · {formatDuration(meeting.durationMs)}</span>
                 </span>
-                <StatusBadge label={meeting.status} tone={statusTone(meeting.status)} />
+                <span className="meeting-row-end">
+                  <StatusBadge label={meeting.status} tone={statusTone(meeting.status)} icon={statusIcon(meeting.status)} />
+                  <Icon name="forward" />
+                </span>
               </button>
             </li>)}
           </ul>}

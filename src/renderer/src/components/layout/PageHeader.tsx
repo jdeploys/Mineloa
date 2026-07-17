@@ -1,4 +1,5 @@
 import { forwardRef, type ReactNode } from 'react'
+import { Icon } from '../ui/Icon'
 
 export const PageHeader = forwardRef<
   HTMLHeadingElement,
@@ -15,7 +16,8 @@ export const PageHeader = forwardRef<
     <header className="page-header">
       {backLabel === undefined || onBack === undefined ? null : (
         <button type="button" className="back-button" onClick={onBack}>
-          ← {backLabel}
+          <Icon name="back" />
+          {backLabel}
         </button>
       )}
       <div className="page-header-row">

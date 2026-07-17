@@ -154,6 +154,9 @@ describe('common UI semantics', () => {
       'aria-current',
       'page',
     )
+    for (const name of ['전체 기록', '요약 템플릿', '설정', '.nnote 가져오기']) {
+      expect(within(navigation).getByRole('button', { name }).querySelector('.ui-icon')).toBeVisible()
+    }
     fireEvent.click(screen.getByRole('button', { name: 'Nnote 홈' }))
     fireEvent.click(within(navigation).getByRole('button', { name: '.nnote 가져오기' }))
     expect(onNavigate).toHaveBeenCalledWith('all')
@@ -177,7 +180,9 @@ describe('common UI semantics', () => {
 
     expect(headingRef.current).toBe(screen.getByRole('heading', { name: '설정' }))
     expect(headingRef.current).toHaveAttribute('tabindex', '-1')
-    fireEvent.click(screen.getByRole('button', { name: '← 전체 기록' }))
+    const back = screen.getByRole('button', { name: '전체 기록' })
+    expect(back.querySelector('.ui-icon')).toBeVisible()
+    fireEvent.click(back)
     expect(onBack).toHaveBeenCalledOnce()
     expect(screen.getByText('활성')).toHaveAttribute('data-tone', 'active')
   })

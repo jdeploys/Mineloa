@@ -2,7 +2,7 @@
 .topbar { position: sticky; top: 0; z-index: 10; min-height: 64px; border-bottom: 1px solid var(--hairline); background: color-mix(in srgb, var(--surface-1) 92%, transparent); display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 8px 32px; backdrop-filter: blur(16px); }
 .brand { min-height: 48px; border: 0; background: transparent; color: var(--ink); padding: 8px 0; font-size: 17px; font-weight: 700; letter-spacing: -.04em; }
 .app-nav { display: flex; align-items: center; gap: 4px; }
-.app-nav button { min-height: 48px; border-color: transparent; background: transparent; color: var(--ink-subtle); padding: 8px 12px; }
+.app-nav button { min-height: 48px; border-color: transparent; background: transparent; color: var(--ink-subtle); display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; }
 .app-nav button:hover:not(:disabled), .app-nav button[aria-current='page'] { background: var(--surface-2); color: var(--ink); }
 .app-nav button[aria-current='page'] { border-color: var(--hairline); }
 .nav-import { margin-left: 8px; }
@@ -19,7 +19,7 @@
 .page-header h1 { margin: 0; color: var(--ink); font-size: var(--type-size-display-xl); line-height: 1.2; }
 .page-header-row > div > p:last-child { margin: 8px 0 0; color: var(--ink-subtle); }
 .eyebrow { margin: 0 0 8px; color: var(--ink-subtle); font-size: var(--type-size-badge); font-weight: 700; letter-spacing: .12em; }
-.back-button { justify-self: start; min-height: 48px; border-color: transparent; background: transparent; color: var(--ink-subtle); padding-inline: 0; }
+.back-button { justify-self: start; min-height: 48px; border-color: transparent; background: transparent; color: var(--ink-subtle); display: inline-flex; align-items: center; gap: 8px; padding-inline: 0; }
 
 .action-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .action-bar > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -68,6 +68,7 @@
 .meeting-list li { border-bottom: 1px solid var(--hairline); }
 .meeting-row { width: 100%; min-height: 72px; border: 0; border-radius: 0; background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 4px; text-align: left; }
 .meeting-row:hover:not(:disabled) { background: var(--surface-2); }
+.meeting-row-end { display: inline-flex; align-items: center; gap: 10px; color: var(--ink-tertiary); }
 .meeting-copy { display: grid; gap: 4px; min-width: 0; }
 .meeting-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 14px; font-weight: 500; }
 .meeting-copy > span { color: var(--ink-tertiary); font-size: 12px; }
