@@ -29,12 +29,47 @@ const documentFixture = (): MeetingDocument => ({
 describe('single-document meeting detail', () => {
   afterEach(cleanup)
 
+  it('renders meeting status and processing actions before summary content', () => {
+    render(<MeetingDetail document={documentFixture()} onBack={vi.fn()} onRenameSpeaker={vi.fn()} />)
+    const main = screen.getByRole('main')
+    const text = main.textContent ?? ''
+    expect(text.indexOf('오디오 및 처리')).toBeLessThan(text.indexOf('핵심 요약'))
+    expect(screen.getByText('completed')).toHaveAttribute('data-tone', 'success')
+  })
+
+  it('keeps retry, speaker rename and both export actions reachable', async () => {
+    const user = userEvent.setup()
+    const source = documentFixture()
+    const rename = vi.fn(async (_meetingId: string, _speakerId: string, displayName: string) => ({ ...source.speakers[0]!, displayName }))
+    const processing = {
+      getStatus: vi.fn(), process: vi.fn(),
+      retry: vi.fn(async () => ({ meetingId: 'meeting-1', state: 'completed' as const, failedStage: null, retryable: false, audioRequired: false, error: null })),
+      onProgress: vi.fn(() => () => undefined),
+    }
+    const archive = {
+      exportMeeting: vi.fn(async () => ({ status: 'success' as const, includedAudio: true, audioCoverage: 'all-parts' as const })),
+      exportMarkdown: vi.fn(async () => ({ status: 'success' as const })), importMeeting: vi.fn(),
+    }
+    render(<MeetingDetail document={source} initialProcessingStatus={{ meetingId: 'meeting-1', state: 'failed', failedStage: 'summarizing', retryable: true, audioRequired: false, error: { code: 'OPENAI_NETWORK', message: 'retry' } }} processing={processing} archive={archive} onRefresh={vi.fn()} onBack={vi.fn()} onRenameSpeaker={rename} />)
+    await user.click(screen.getByRole('button', { name: '요약 다시 시도' }))
+    await user.clear(screen.getByLabelText('화자 B 이름'))
+    await user.type(screen.getByLabelText('화자 B 이름'), '민지')
+    await user.click(screen.getByRole('button', { name: '화자 B 이름 저장' }))
+    await user.click(screen.getByRole('button', { name: '.nnote 내보내기' }))
+    await user.click(screen.getByRole('button', { name: 'Markdown 내보내기' }))
+    expect(processing.retry).toHaveBeenCalledTimes(1)
+    expect(rename).toHaveBeenCalledTimes(1)
+    expect(archive.exportMeeting).toHaveBeenCalledTimes(1)
+    expect(archive.exportMarkdown).toHaveBeenCalledTimes(1)
+  })
+
   it('meeting-detail-shows-completed-document-in-approved-order', () => {
     render(<MeetingDetail document={documentFixture()} onBack={vi.fn()} onRenameSpeaker={vi.fn()} />)
     const headings = screen.getAllByRole('heading').map((node) => node.textContent)
-    expect(headings).toEqual(['제품 회의', '핵심 요약', '결정사항', '할 일', '주요 논의', '화자 이름', '전체 전사문', 'Markdown 미리보기'])
+    expect(headings).toEqual(['제품 회의', '오디오 및 처리', '핵심 요약', '결정사항', '할 일', '주요 논의', '화자 이름', '전체 전사문'])
     expect(screen.getByLabelText('회의 오디오')).toHaveAttribute('src', 'nnote-media://meeting/bWVldGluZy0x')
-    expect(screen.getByRole('article')).toHaveClass('document-panel')
+    expect(screen.getByRole('article', { name: '회의 문서' })).toHaveClass('meeting-document')
+    expect(screen.getByText('Markdown 미리보기').closest('details')).not.toHaveAttribute('open')
     expect(screen.getByTestId('markdown-preview')).toHaveClass('markdown-code')
   })
 

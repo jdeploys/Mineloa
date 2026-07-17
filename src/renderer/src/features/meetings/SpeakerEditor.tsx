@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Speaker } from '../../../../shared/contracts/meeting'
+import { Button } from '../../components/ui/Button'
 
 export function SpeakerEditor({
   speakers,
@@ -29,7 +30,7 @@ export function SpeakerEditor({
       <label htmlFor={`speaker-${speaker.id}`}>{speaker.displayName} 이름</label>
       <div>
         <input id={`speaker-${speaker.id}`} value={names[speaker.id] ?? ''} onChange={(event) => setNames((current) => ({ ...current, [speaker.id]: event.target.value }))} />
-        <button type="button" disabled={pendingId !== null} onClick={() => void save(speaker)}>{speaker.displayName} 이름 저장</button>
+        <Button variant="primary" disabled={pendingId !== null} onClick={() => void save(speaker)}>{speaker.displayName} 이름 저장</Button>
       </div>
     </div>)}
     {error && <p role="alert">{error}</p>}

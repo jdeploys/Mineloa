@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProcessingApi, ProcessingStatus as Status } from '../../../../shared/contracts/processing'
+import { InlineNotice } from '../../components/feedback/InlineNotice'
+import { Button } from '../../components/ui/Button'
 
 export function ProcessingStatus({ meetingId, processing, initialStatus, onStatusChange }: { meetingId: string; processing: ProcessingApi; initialStatus: Status; onStatusChange?(status: Status): void }) {
   const [status, setStatus] = useState(initialStatus)
@@ -27,6 +29,9 @@ export function ProcessingStatus({ meetingId, processing, initialStatus, onStatu
   const action = status.failedStage === 'transcribing' ? '전사 다시 시도'
     : status.failedStage === 'summarizing' ? '요약 다시 시도'
       : status.failedStage === 'cleanup' ? '오디오 정리 다시 시도' : '전사 및 요약 시작'
+  const tone = status.state === 'completed' ? 'success'
+    : active ? 'info'
+      : status.failedStage !== null ? (status.retryable ? 'warning' : 'error') : 'info'
 
   async function submit() {
     if (active) return
@@ -51,13 +56,17 @@ export function ProcessingStatus({ meetingId, processing, initialStatus, onStatu
     }
   }
 
-  return <section className="processing-panel" aria-label="AI 처리 상태">
-    <p>{label}</p>
-    <p>{status.audioRequired ? '원본 오디오 필요' : '원본 오디오 불필요'}</p>
-    {status.error && <p>{status.error.message}</p>}
-    {error && <p role="alert">{error}</p>}
-    {status.state !== 'completed' && <button type="button" disabled={active || (status.failedStage !== null && !status.retryable)} onClick={() => void submit()}>
-      {active ? '처리 중' : action}
-    </button>}
-  </section>
+  return <InlineNotice tone={tone} title="AI 처리 상태">
+    <div className="processing-panel">
+      <div className="processing-copy">
+        <strong>{label}</strong>
+        <span>{status.audioRequired ? '원본 오디오 필요' : '원본 오디오 불필요'}</span>
+        {status.error && <span>{status.error.message}</span>}
+      </div>
+      {status.state !== 'completed' && <Button variant="primary" disabled={active || (status.failedStage !== null && !status.retryable)} onClick={() => void submit()}>
+        {active ? '처리 중' : action}
+      </Button>}
+    </div>
+    {error && <p className="processing-error" role="alert">{error}</p>}
+  </InlineNotice>
 }

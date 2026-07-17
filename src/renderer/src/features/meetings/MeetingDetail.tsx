@@ -3,6 +3,12 @@ import type { ArchiveApi } from '../../../../shared/contracts/archive'
 import type { ProcessingApi, ProcessingStatus as ProcessingStatusValue } from '../../../../shared/contracts/processing'
 import type { Speaker } from '../../../../shared/contracts/meeting'
 import type { DocumentSummarySection, MeetingDocument } from '../../../../shared/contracts/meetingsApi'
+import { InlineNotice } from '../../components/feedback/InlineNotice'
+import { ActionBar } from '../../components/layout/ActionBar'
+import { PageHeader } from '../../components/layout/PageHeader'
+import { Button } from '../../components/ui/Button'
+import { StatusBadge } from '../../components/ui/StatusBadge'
+import { SurfaceCard } from '../../components/ui/SurfaceCard'
 import { SpeakerEditor } from './SpeakerEditor'
 import { Transcript } from './Transcript'
 import { ProcessingStatus } from './ProcessingStatus'
@@ -40,6 +46,13 @@ function markdown(document: MeetingDocument, speakers: readonly Speaker[]): stri
   lines.push('## 전체 전사문')
   for (const segment of document.transcript) lines.push(`- ${segment.speakerId === null ? '화자 미상' : names.get(segment.speakerId) ?? segment.speakerId}: ${segment.text}`)
   return lines.join('\n')
+}
+
+function meetingStatusTone(status: MeetingDocument['meeting']['status']): 'success' | 'warning' | 'danger' | 'active' {
+  if (status === 'completed' || status === 'recorded') return 'success'
+  if (status === 'failed') return 'danger'
+  if (status === 'recording') return 'active'
+  return 'warning'
 }
 
 export function MeetingDetail({ document, onBack, onRenameSpeaker, headingRef, processing, initialProcessingStatus, archive, onRefresh }: {
@@ -80,7 +93,7 @@ export function MeetingDetail({ document, onBack, onRenameSpeaker, headingRef, p
     }
   }
   const names = new Map(speakers.map((speaker) => [speaker.id, speaker.displayName]))
-  const [archiveMessage, setArchiveMessage] = useState<string | null>(null)
+  const [archiveMessage, setArchiveMessage] = useState<{ tone: 'success' | 'info' | 'error'; message: string } | null>(null)
   const orderedSections = document.summarySections.slice().sort((a, b) => a.orderIndex - b.orderIndex)
   const audioParts = document.audioParts ?? (document.audioUrl === null ? [] : [{
     partIndex: 0, url: document.audioUrl, byteCount: document.meeting.audioByteCount,
@@ -92,26 +105,29 @@ export function MeetingDetail({ document, onBack, onRenameSpeaker, headingRef, p
     const result = kind === 'nnote'
       ? await archive.exportMeeting(document.meeting.id)
       : await archive.exportMarkdown(document.meeting.id)
-    setArchiveMessage(result.status === 'success' ? '내보내기를 완료했습니다.'
-      : result.status === 'cancelled' ? '내보내기를 취소했습니다.' : result.message)
+    setArchiveMessage(result.status === 'success' ? { tone: 'success', message: '내보내기를 완료했습니다.' }
+      : result.status === 'cancelled' ? { tone: 'info', message: '내보내기를 취소했습니다.' }
+        : { tone: 'error', message: result.message })
   }
 
-  return <main className="document-shell">
-    <button type="button" className="back-button" onClick={onBack}>← 전체 기록</button>
-    <article className="meeting-document document-panel">
-      <header className="document-header">
-        <span className={`status status-${document.meeting.status}`}>{document.meeting.status}</span>
-        <h1 ref={headingRef} tabIndex={-1}>{document.meeting.title}</h1>
-        <p className="document-meta">{new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' }).format(new Date(document.meeting.createdAt))} · {formatDuration(document.meeting.durationMs)}</p>
-        {audioParts.length === 0 ? <p className="muted">보존된 원본 오디오가 없습니다.</p> : audioParts.map((part) => <div key={part.partIndex}><span>오디오 파트 {part.partIndex + 1}</span><audio aria-label={audioParts.length === 1 ? '회의 오디오' : `회의 오디오 파트 ${part.partIndex + 1}`} controls preload="metadata" src={part.url} /></div>)}
-        {processing !== undefined && initialProcessingStatus !== undefined && <ProcessingStatus meetingId={document.meeting.id} processing={processing} initialStatus={initialProcessingStatus} onStatusChange={(status) => { if (status.state === 'completed' || status.state === 'failed' || status.state === 'cleanup_failed') void onRefresh?.() }} />}
-        {archive !== undefined && <div className="document-actions"><button type="button" onClick={() => void exportDocument('nnote')}>.nnote 내보내기</button><button type="button" onClick={() => void exportDocument('markdown')}>Markdown 내보내기</button></div>}
-        {archiveMessage !== null && <p role="status">{archiveMessage}</p>}
-      </header>
+  const formattedMeta = `${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long' }).format(new Date(document.meeting.createdAt))} · ${formatDuration(document.meeting.durationMs)}`
+
+  return <main className="page-container meeting-page">
+    <PageHeader ref={headingRef} backLabel="전체 기록" onBack={onBack} title={document.meeting.title} description={formattedMeta} trailing={<StatusBadge label={document.meeting.status} tone={meetingStatusTone(document.meeting.status)} />} />
+    <SurfaceCard className="meeting-overview" labelledBy="meeting-audio-title">
+      <h2 id="meeting-audio-title">오디오 및 처리</h2>
+      <div className="audio-parts">
+        {audioParts.length === 0 ? <p className="muted">보존된 원본 오디오가 없습니다.</p> : audioParts.map((part) => <div className="audio-part" key={part.partIndex}><span>오디오 파트 {part.partIndex + 1}</span><audio aria-label={audioParts.length === 1 ? '회의 오디오' : `회의 오디오 파트 ${part.partIndex + 1}`} controls preload="metadata" src={part.url} /></div>)}
+      </div>
+      {processing === undefined || initialProcessingStatus === undefined ? null : <ProcessingStatus meetingId={document.meeting.id} processing={processing} initialStatus={initialProcessingStatus} onStatusChange={(status) => { if (status.state === 'completed' || status.state === 'failed' || status.state === 'cleanup_failed') void onRefresh?.() }} />}
+      {archive === undefined ? null : <ActionBar><Button onClick={() => void exportDocument('nnote')}>.nnote 내보내기</Button><Button variant="tertiary" onClick={() => void exportDocument('markdown')}>Markdown 내보내기</Button></ActionBar>}
+      {archiveMessage === null ? null : <InlineNotice tone={archiveMessage.tone} title="내보내기 결과"><p role="status">{archiveMessage.message}</p></InlineNotice>}
+    </SurfaceCard>
+    <article className="meeting-document" aria-label="회의 문서">
       {orderedSections.map((section) => <section className="document-section" key={section.id}><h2>{section.title}</h2>{section.kind === 'action_items' ? (document.actionItems.length === 0 ? <p className="muted">등록된 할 일이 없습니다.</p> : <ul className="action-list">{document.actionItems.map((item) => <li key={item.id}><span>{item.content}</span><small>담당: {item.assigneeSpeakerId === null ? '미정' : names.get(item.assigneeSpeakerId) ?? item.assigneeSpeakerId}</small></li>)}</ul>) : sectionBody(section, speakers)}</section>)}
       <section className="document-section"><h2>화자 이름</h2><SpeakerEditor speakers={speakers} onRename={rename} /></section>
       <section className="document-section"><h2>전체 전사문</h2><Transcript segments={document.transcript} speakers={speakers} /></section>
-      <section className="document-section markdown-preview"><h2>Markdown 미리보기</h2><pre className="markdown-code" data-testid="markdown-preview">{markdown(document, speakers)}</pre></section>
+      <details className="document-section markdown-preview"><summary>Markdown 미리보기</summary><pre className="markdown-code" data-testid="markdown-preview">{markdown(document, speakers)}</pre></details>
     </article>
   </main>
 }

@@ -20,8 +20,10 @@ describe('ProcessingStatus', () => {
     const completed = { meetingId: 'm1', state: 'completed' as const, failedStage: null, retryable: false, audioRequired: false, error: null }
     const retry = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(completed)
     render(<ProcessingStatus meetingId="m1" processing={{ getStatus: vi.fn(), process: vi.fn(), retry, onProgress: vi.fn(() => () => {}) }} initialStatus={{ meetingId: 'm1', state: 'failed', failedStage: 'summarizing', retryable: true, audioRequired: false, error: { code: 'OPENAI_NETWORK', message: '네트워크 오류' } }} />)
+    expect(screen.getByRole('note', { name: 'AI 처리 상태' })).toHaveAttribute('data-tone', 'warning')
     expect(screen.getByText('요약 실패')).toBeInTheDocument()
     expect(screen.getByText('원본 오디오 불필요')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '요약 다시 시도' })).toHaveAttribute('data-variant', 'primary')
     fireEvent.click(screen.getByRole('button', { name: '요약 다시 시도' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('offline')
     fireEvent.click(screen.getByRole('button', { name: '요약 다시 시도' }))
@@ -30,6 +32,7 @@ describe('ProcessingStatus', () => {
 
   it('renders completed state without a start action', () => {
     render(<ProcessingStatus meetingId="m1" processing={{ getStatus: vi.fn(), process: vi.fn(), retry: vi.fn(), onProgress: vi.fn(() => () => {}) }} initialStatus={{ meetingId: 'm1', state: 'completed', failedStage: null, retryable: false, audioRequired: false, error: null }} />)
+    expect(screen.getByRole('note', { name: 'AI 처리 상태' })).toHaveAttribute('data-tone', 'success')
     expect(screen.getByText('처리 완료')).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
