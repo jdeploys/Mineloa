@@ -72,18 +72,23 @@ textarea {
   border-radius: var(--radius-control);
 }
 
-.ui-button[data-variant='primary'] {
+.ui-button[data-variant='primary'],
+.button-primary {
   border-color: var(--primary);
   background: var(--primary);
   color: #ffffff;
 }
 
-.ui-button[data-variant='primary']:hover:not(:disabled) {
+.ui-button[data-variant='primary']:hover:not(:disabled),
+.ui-button[data-variant='primary']:active:not(:disabled),
+.button-primary:hover:not(:disabled),
+.button-primary:active:not(:disabled) {
   border-color: var(--primary-active);
   background: var(--primary-active);
 }
 
-.ui-button[data-variant='primary']:disabled {
+.ui-button[data-variant='primary']:disabled,
+.button-primary:disabled {
   border-color: var(--primary-disabled);
   background: var(--primary-disabled);
 }
@@ -93,9 +98,19 @@ textarea {
   background: transparent;
 }
 
-.ui-button[data-variant='danger'] {
+.ui-button[data-variant='danger'],
+.button-danger {
   border-color: color-mix(in srgb, var(--danger) 35%, var(--hairline));
   background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger);
+}
+
+.ui-button[data-variant='danger']:hover:not(:disabled),
+.ui-button[data-variant='danger']:active:not(:disabled),
+.button-danger:hover:not(:disabled),
+.button-danger:active:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--hairline));
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: var(--danger);
 }
 

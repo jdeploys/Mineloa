@@ -180,4 +180,18 @@ describe('common UI semantics', () => {
     expect(app).toContain('.inline-notice')
     expect(app).toContain('.troubleshooting')
   })
+
+  it('keeps legacy feature primary and danger actions visually distinct until migration', () => {
+    const globals = readFileSync('src/renderer/src/styles/globals.css', 'utf8')
+
+    expect(globals).toMatch(
+      /\.ui-button\[data-variant='primary'\],\s*\.button-primary\s*\{[^}]*var\(--primary\)/s,
+    )
+    expect(globals).toMatch(
+      /\.button-primary:hover:not\(:disabled\),\s*\.button-primary:active:not\(:disabled\)\s*\{[^}]*var\(--primary-active\)/s,
+    )
+    expect(globals).toMatch(
+      /\.ui-button\[data-variant='danger'\],\s*\.button-danger\s*\{[^}]*var\(--danger\)/s,
+    )
+  })
 })
