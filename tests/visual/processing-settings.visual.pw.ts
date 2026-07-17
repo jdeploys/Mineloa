@@ -50,6 +50,56 @@ async function open(page: Page, state: string, expanded: boolean, theme: Fixture
   await page.waitForTimeout(150)
 }
 
+async function themeControlGeometry(page: Page) {
+  return page.locator('.theme-options > label').evaluateAll((labels) => labels.map((label) => {
+    const radio = label.querySelector('input[type="radio"]')
+    const text = [...label.childNodes].find((node) => node.nodeType === Node.TEXT_NODE)
+
+    if (!(radio instanceof HTMLInputElement) || text === undefined) {
+      throw new Error('Theme option must contain a radio and its visible label text')
+    }
+
+    const radioRect = radio.getBoundingClientRect()
+    const textRange = document.createRange()
+    textRange.selectNodeContents(text)
+    const textRect = textRange.getBoundingClientRect()
+    const labelRect = label.getBoundingClientRect()
+
+    return {
+      radioWidth: radioRect.width,
+      radioHeight: radioRect.height,
+      radioRight: radioRect.right,
+      radioCenterY: radioRect.top + radioRect.height / 2,
+      textLeft: textRect.left,
+      textCenterY: textRect.top + textRect.height / 2,
+      labelHeight: labelRect.height,
+    }
+  }))
+}
+
+async function apiKeyControlGeometry(page: Page) {
+  return page.getByLabel('OpenAI API 키').evaluate((input) => {
+    const form = input.closest('form')
+    if (!(input instanceof HTMLInputElement) || !(form instanceof HTMLFormElement)) {
+      throw new Error('API-key text input must remain inside its settings form')
+    }
+
+    const inputRect = input.getBoundingClientRect()
+    const formRect = form.getBoundingClientRect()
+    const styles = getComputedStyle(input)
+
+    return {
+      inputWidth: inputRect.width,
+      inputHeight: inputRect.height,
+      formWidth: formRect.width,
+      inputLeft: inputRect.left,
+      formLeft: formRect.left,
+      minHeight: styles.minHeight,
+      padding: styles.padding,
+    }
+  })
+}
+
 for (const [state, snapshot, expanded] of [
   ['provider-defaults', 'processing-providers-defaults.png', false],
   ['provider-advanced', 'processing-providers-advanced.png', true],
@@ -75,6 +125,44 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByRole('radio', { name: theme === 'light' ? '라이트' : '다크' })).toBeInViewport()
     await expect(page).toHaveScreenshot(`settings-${theme}.png`, { animations: 'disabled', fullPage: false, omitBackground: false })
   })
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [1200, 640]) {
+    test(`real settings ${theme} keeps compact, label-aligned theme radios at ${width}x800`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await open(page, 'provider-advanced', true, theme)
+
+      const geometry = await themeControlGeometry(page)
+      expect(geometry).toHaveLength(3)
+      for (const option of geometry) {
+        expect(option.radioWidth).toBeGreaterThanOrEqual(16)
+        expect(option.radioWidth).toBeLessThanOrEqual(20)
+        expect(option.radioHeight).toBeGreaterThanOrEqual(16)
+        expect(option.radioHeight).toBeLessThanOrEqual(20)
+        expect(option.labelHeight).toBeLessThanOrEqual(24)
+        expect(Math.abs(option.radioCenterY - option.textCenterY)).toBeLessThanOrEqual(1)
+        expect(option.textLeft - option.radioRight).toBeGreaterThanOrEqual(7)
+        expect(option.textLeft - option.radioRight).toBeLessThanOrEqual(9)
+      }
+
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      await expect(page.getByText('시스템 설정은 Windows 또는 macOS의 화면 모드를 자동으로 따릅니다.')).toBeVisible()
+    })
+
+    test(`real settings ${theme} keeps API-key text input full-width sizing at ${width}x800`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await open(page, 'provider-advanced', true, theme)
+
+      const geometry = await apiKeyControlGeometry(page)
+      expect(geometry.inputWidth).toBeGreaterThan(300)
+      expect(geometry.inputWidth).toBeGreaterThanOrEqual(geometry.formWidth * 0.7)
+      expect(geometry.inputHeight).toBe(48)
+      expect(geometry.inputLeft).toBe(geometry.formLeft)
+      expect(geometry.minHeight).toBe('48px')
+      expect(geometry.padding).toBe('12px')
+    })
+  }
 }
 
 for (const width of [938, 640]) {
