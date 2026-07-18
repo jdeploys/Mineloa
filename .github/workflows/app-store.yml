@@ -70,7 +70,6 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
           CSC_INSTALLER_LINK: build/installer.p12
           CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
-          CSC_NAME: Apple Distribution
           MAS_BUILD: 'true'
         run: |
           set -euo pipefail
