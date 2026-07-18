@@ -1,0 +1,30 @@
+name: bootstrap-app-store-signing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create-signing-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Create public certificates and provisioning profile
+        env:
+          ASC_API_PRIVATE_KEY: ${{ secrets.ASC_API_PRIVATE_KEY }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          DISTRIBUTION_CERTIFICATE_ID: Q7Q28QZRNY
+          INSTALLER_CSR_CONTENT: ${{ secrets.MAS_BOOTSTRAP_INSTALLER_CSR }}
+        run: node scripts/bootstrap-app-store-signing.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mineloa-signing-assets
+          path: signing-assets
+          retention-days: 1
+          if-no-files-found: error
