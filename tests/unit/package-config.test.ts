@@ -49,8 +49,8 @@ describe('release package configuration', () => {
       .toContain("extensions: ['nnote']")
   })
 
-  it('defines the exact 0.0.1 cross-platform prerelease contract', () => {
-    expect(manifest.version).toBe('0.0.1')
+  it('defines a version-neutral tagged cross-platform prerelease contract', () => {
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/)
     expect(manifest.scripts).toMatchObject({
       'package:win:x64': expect.stringContaining('--x64'),
       'package:mac:x64': expect.stringContaining('--x64'),
@@ -60,7 +60,11 @@ describe('release package configuration', () => {
     expect(existsSync(workflowPath)).toBe(true)
     if (!existsSync(workflowPath)) return
     const workflow = readFileSync(workflowPath, 'utf8')
-    expect(workflow).toContain('v0.0.1')
+    expect(workflow).not.toContain('0.0.1')
+    expect(workflow).toContain("tags: ['v*']")
+    expect(workflow).toContain("VERSION=$(node -p \"require('./package.json').version\")")
+    expect(workflow).toContain('test "$GITHUB_REF_NAME" = "v${VERSION}"')
+    expect(workflow).toMatch(/release:\s+[\s\S]*?steps:\s+- uses: actions\/checkout@/)
     expect(workflow).toContain('contents: write')
     expect(workflow).toContain('--prerelease')
     expect(workflow).toContain('scripts/verify-package.mjs')
@@ -87,8 +91,8 @@ describe('release package configuration', () => {
     expect(workflow).toContain('build-local-runtime.ps1')
     expect(workflow).toContain('build-local-runtime.sh')
     expect(workflow).toContain('"localRuntime":true')
-    expect(workflow).toContain('gh release upload v0.0.1 --clobber')
-    expect(workflow).not.toContain('gh release create v0.0.1')
+    expect(workflow).toContain('gh release upload "$TAG" --clobber')
+    expect(workflow).toContain('gh release create "$TAG"')
   })
 
   it('builds the macOS runtime only for release while preserving the matrix architecture argument', () => {

@@ -1,8 +1,17 @@
-import { copyFile, mkdir, readdir } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
-const [extension, outputName] = process.argv.slice(2)
-if (!extension || !outputName) throw new Error('Usage: prepare-release-assets.mjs <extension> <output-name>')
+const [extension, platform, arch] = process.argv.slice(2)
+if (!extension || !platform || !arch) {
+  throw new Error('Usage: prepare-release-assets.mjs <extension> <platform> <arch>')
+}
+
+const manifest = JSON.parse(await readFile(resolve('package.json'), 'utf8'))
+const version = manifest.version
+if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) {
+  throw new Error(`Invalid package version: ${String(version)}`)
+}
+const outputName = `Mineloa-${version}-${platform}-${arch}${extension}`
 
 const dist = resolve('dist')
 const candidates = (await readdir(dist, { withFileTypes: true }))
