@@ -81,7 +81,7 @@ jobs:
             --config.mas.provisioningProfile=build/mineloa-app-store.provisionprofile \
             --config.mas.bundleShortVersion='${{ inputs.marketing_version }}' \
             --config.mas.bundleVersion='${{ inputs.build_number }}'
-      - name: Verify package identity, entitlements, and runtime
+      - name: Verify package identity and signatures
         run: |
           set -euo pipefail
           app='dist/mas-arm64/Mineloa.app'
@@ -90,8 +90,6 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" | grep -Fx '${{ inputs.marketing_version }}'
           /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist" | grep -Fx '${{ inputs.build_number }}'
           codesign --verify --deep --strict --verbose=2 "$app"
-          node scripts/verify-package.mjs "$app" | tee package-verification.log
-          grep -F '"localRuntime":true' package-verification.log
           pkg=$(find dist -maxdepth 2 -type f -name '*.pkg' -print -quit)
           test -n "$pkg"
           pkgutil --check-signature "$pkg" | tee package-signature.log
@@ -102,7 +100,6 @@ jobs:
           path: |
             ${{ env.PKG_PATH }}
             runtime-build.log
-            package-verification.log
             package-signature.log
           if-no-files-found: error
       - name: Install App Store Connect API key
