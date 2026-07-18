@@ -72,6 +72,18 @@ describe('processing provider settings visible outcomes', () => {
     expect(screen.getByLabelText('요약 방식')).toHaveValue('openai')
   })
 
+  it('does not show Codex CLI when the build omits its provider descriptor', async () => {
+    const appStoreDescriptors = descriptors.filter((descriptor) => descriptor.id !== 'codex_cli')
+    render(<ProcessingProviderSettingsView settings={settingsApi({
+      listProcessingProviderDescriptors: vi.fn(async () => appStoreDescriptors),
+    })} />)
+    await expand()
+
+    expect(screen.getByLabelText('요약 방식')).toHaveValue('openai')
+    expect(screen.queryByRole('option', { name: 'Codex CLI' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Codex CLI 상태' })).not.toBeInTheDocument()
+  })
+
   it('persists only the selected transcription setting and preserves summary/model', async () => {
     const api = settingsApi()
     render(<ProcessingProviderSettingsView settings={api} />)

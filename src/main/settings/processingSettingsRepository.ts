@@ -10,8 +10,19 @@ const defaultProcessingProviderSettings: ProcessingProviderSettings = {
   localWhisperModel: 'base',
 }
 
+interface ProcessingSettingsRepositoryOptions {
+  readonly codexCliEnabled?: boolean
+}
+
 export class ProcessingSettingsRepository {
-  constructor(private readonly database: Database.Database) {}
+  private readonly codexCliEnabled: boolean
+
+  constructor(
+    private readonly database: Database.Database,
+    options: ProcessingSettingsRepositoryOptions = {},
+  ) {
+    this.codexCliEnabled = options.codexCliEnabled ?? true
+  }
 
   get(): ProcessingProviderSettings {
     const row = this.database.prepare('SELECT value_json FROM app_settings WHERE key = ?')
@@ -23,15 +34,22 @@ export class ProcessingSettingsRepository {
       stored = null
     }
     const parsed = ProcessingProviderSettingsSchema.safeParse(stored)
-    return parsed.success ? parsed.data : { ...defaultProcessingProviderSettings }
+    return this.reconcile(
+      parsed.success ? parsed.data : { ...defaultProcessingProviderSettings },
+    )
   }
 
   update(input: ProcessingProviderSettings): ProcessingProviderSettings {
-    const value = ProcessingProviderSettingsSchema.parse(input)
+    const value = this.reconcile(ProcessingProviderSettingsSchema.parse(input))
     this.database.prepare(`
       INSERT INTO app_settings(key, value_json) VALUES (?, ?)
       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json
     `).run('processing_providers', JSON.stringify(value))
     return value
+  }
+
+  private reconcile(value: ProcessingProviderSettings): ProcessingProviderSettings {
+    if (this.codexCliEnabled || value.summaryProvider !== 'codex_cli') return value
+    return { ...value, summaryProvider: 'openai' }
   }
 }

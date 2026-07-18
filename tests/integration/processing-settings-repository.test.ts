@@ -88,6 +88,36 @@ describe('processing settings repository', () => {
     database.close()
   })
 
+  it('reconciles Codex CLI settings to OpenAI when the build disables Codex', () => {
+    const database = openDatabase(temporaryDatabasePath())
+    const settings = new ProcessingSettingsRepository(database, { codexCliEnabled: false })
+
+    database.prepare('UPDATE app_settings SET value_json = ? WHERE key = ?')
+      .run(JSON.stringify({
+        transcriptionProvider: 'local_whisper',
+        summaryProvider: 'codex_cli',
+        localWhisperModel: 'small',
+      }), 'processing_providers')
+
+    expect(settings.get()).toEqual({
+      transcriptionProvider: 'local_whisper',
+      summaryProvider: 'openai',
+      localWhisperModel: 'small',
+    })
+    expect(settings.update({
+      transcriptionProvider: 'openai',
+      summaryProvider: 'codex_cli',
+      localWhisperModel: 'base',
+    })).toEqual({
+      transcriptionProvider: 'openai',
+      summaryProvider: 'openai',
+      localWhisperModel: 'base',
+    })
+    expect(database.prepare('SELECT value_json FROM app_settings WHERE key = ?').pluck().get('processing_providers'))
+      .toBe('{"transcriptionProvider":"openai","summaryProvider":"openai","localWhisperModel":"base"}')
+    database.close()
+  })
+
   it('validates processing provider settings at the IPC boundary', async () => {
     const database = openDatabase(temporaryDatabasePath())
     const settings = new ProcessingSettingsRepository(database)

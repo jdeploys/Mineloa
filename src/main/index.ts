@@ -66,7 +66,9 @@ if (verificationRequest !== null) {
       start: () => {
         const meetings = new MeetingRepository(database)
         const credentialStore = new KeyringCredentialStore()
-        const processingSettings = new ProcessingSettingsRepository(database)
+        const processingSettings = new ProcessingSettingsRepository(database, {
+          codexCliEnabled: !process.mas,
+        })
         const whisperModels = new WhisperModelManager(join(userDataDirectory, 'models', 'whisper'))
         const registry = new ProviderRegistry(
           [
@@ -88,11 +90,13 @@ if (verificationRequest !== null) {
           ],
           [
             new OpenAiSummaryAdapter(new OpenAiSummaryGateway(credentialStore)),
-            new CodexCliSummaryAdapter(
-              runOwnedProcess,
-              app.getPath('temp'),
-              createCodexCommandResolver({ disabled: process.mas }),
-            ),
+            ...(!process.mas ? [
+              new CodexCliSummaryAdapter(
+                runOwnedProcess,
+                app.getPath('temp'),
+                createCodexCommandResolver(),
+              ),
+            ] : []),
           ],
         )
         registerSettingsHandlers(
