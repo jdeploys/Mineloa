@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DesktopApi } from '../../src/shared/contracts/desktopApi'
 import type { MeetingDocument, PublicMeeting } from '../../src/shared/contracts/meetingsApi'
 import { App } from '../../src/renderer/src/App'
-import { RecordingTerminalError } from '../../src/renderer/src/features/recording/mediaRecorderController'
+import { RecordingTerminalError, type RecordingSnapshot } from '../../src/renderer/src/features/recording/mediaRecorderController'
 
 const now = '2026-07-15T00:00:00.000Z'
 const meeting: PublicMeeting = { id: 'meeting-1', title: '제품 회의', createdAt: now, updatedAt: now, durationMs: 1_000, status: 'completed', audioPolicy: 'keep', hasAudio: false, audioByteCount: 0, selectedTemplateId: null }
@@ -195,6 +195,27 @@ describe('App route and recording ownership', () => {
     await user.click(within(screen.getByRole('navigation', { name: '주요 메뉴' })).getByRole('button', { name: '전체 기록' }))
     expect(screen.getByText('녹음 중')).toBeVisible()
     expect(controller.start).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the header quick action synchronized with recording start and stop', async () => {
+    const user = userEvent.setup()
+    const listeners = new Set<(snapshot: RecordingSnapshot) => void>()
+    const idle = { phase: 'idle' as const, meetingId: null, durationMs: 0, totalBytes: 0, warn: false, activePartIndex: 0, partCount: 0, microphone: 'inactive' as const, localSave: 'idle' as const }
+    const publish = (snapshot: RecordingSnapshot) => listeners.forEach((listener) => listener(snapshot))
+    const controller = {
+      subscribe: vi.fn((listener: (snapshot: RecordingSnapshot) => void) => { listeners.add(listener); listener(idle); return () => listeners.delete(listener) }),
+      start: vi.fn(async () => publish({ ...idle, phase: 'recording', meetingId: 'recording-1', microphone: 'active', localSave: 'saved' })),
+      stop: vi.fn(async () => { publish({ ...idle, phase: 'saving', meetingId: 'recording-1', localSave: 'saving' }); publish(idle) }),
+      discard: vi.fn(async () => undefined),
+    }
+    render(<App desktopApi={api()} recordingController={controller} />)
+
+    await user.click(await screen.findByRole('button', { name: '빠른 녹음 시작' }))
+    await user.click(await screen.findByRole('button', { name: '녹음 종료' }))
+
+    expect(controller.start).toHaveBeenCalledOnce()
+    expect(controller.stop).toHaveBeenCalledOnce()
+    expect(await screen.findByRole('button', { name: '빠른 녹음 시작' })).toBeVisible()
   })
 
   it('reaches recorded-to-processing from detail and refreshes the completed document', async () => {

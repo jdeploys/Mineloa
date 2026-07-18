@@ -29,6 +29,7 @@ interface RecordingPanelProps {
   settingsFocusKey?: string
   templates?: TemplatesApi
   startRequest?: number
+  stopRequest?: number
 }
 
 type PanelPhase = 'idle' | 'recording' | 'stop_pending' | 'discard_pending'
@@ -57,7 +58,7 @@ function rememberAudioPolicy(value: AudioPolicy): void {
   try { globalThis.localStorage?.setItem(audioPolicyStorageKey, value) } catch { /* use the current session value */ }
 }
 
-export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templates, startRequest }: RecordingPanelProps) {
+export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templates, startRequest, stopRequest }: RecordingPanelProps) {
   const [phase, setPhase] = useState<PanelPhase>('idle')
   const [terminalFailure, setTerminalFailure] = useState<RecordingTerminalFailure | null>(null)
   const [confirmingDiscard, setConfirmingDiscard] = useState(false)
@@ -71,6 +72,7 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
   const [microphoneDeviceId, setMicrophoneDeviceId] = useState('')
   const [farFieldMode, setFarFieldMode] = useState(true)
   const handledStartRequest = useRef(startRequest ?? 0)
+  const handledStopRequest = useRef(stopRequest ?? 0)
 
   useEffect(() => controls.subscribe?.((next) => {
     setSnapshot(next)
@@ -131,7 +133,7 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
     } finally { setBusy(false) }
   }
 
-  const stop = async () => {
+  const stop = useCallback(async () => {
     setBusy(true)
     setError(null)
     try {
@@ -147,7 +149,18 @@ export function RecordingPanel({ controls, onNavigate, settingsFocusKey, templat
     } finally {
       setBusy(false)
     }
-  }
+  }, [controls])
+
+  useEffect(() => {
+    if (stopRequest === undefined || stopRequest === handledStopRequest.current) return
+    if (phase === 'recording' || phase === 'stop_pending') {
+      if (busy) return
+      handledStopRequest.current = stopRequest
+      void stop()
+      return
+    }
+    handledStopRequest.current = stopRequest
+  }, [busy, phase, stop, stopRequest])
 
   const discard = async () => {
     setBusy(true)

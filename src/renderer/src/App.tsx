@@ -11,6 +11,7 @@ import { MeetingDetail } from './features/meetings/MeetingDetail'
 import {
   MediaRecorderController,
   RecordingTerminalError,
+  type RecordingSnapshot,
 } from './features/recording/mediaRecorderController'
 import { RecoveryDialog } from './features/recording/RecoveryDialog'
 import { RecordingPanel } from './features/recording/RecordingPanel'
@@ -40,6 +41,8 @@ export function App({
   const [error, setError] = useState<string | null>(null)
   const [archiveNotice, setArchiveNotice] = useState<string | null>(null)
   const [quickStartRequest, setQuickStartRequest] = useState(0)
+  const [quickStopRequest, setQuickStopRequest] = useState(0)
+  const [recordingPhase, setRecordingPhase] = useState<RecordingSnapshot['phase']>('idle')
   const routeHeading = useRef<HTMLHeadingElement>(null)
   const returnFocusKey = useRef<string | null>(null)
   const { preference, setPreference } = useThemePreference()
@@ -57,6 +60,7 @@ export function App({
     if (controller.subscribe === undefined) return
     let activeMeeting: string | null = null
     return controller.subscribe((snapshot) => {
+      setRecordingPhase(snapshot.phase)
       if (snapshot.meetingId !== null) activeMeeting = snapshot.meetingId
       if (snapshot.phase === 'idle' && snapshot.meetingId === null && activeMeeting !== null) {
         activeMeeting = null
@@ -115,10 +119,11 @@ export function App({
         }
         throw startError
       }
+      setRecordingPhase('recording')
       await refreshMeetings()
     },
-    stop: async () => { await controller.stop(); setRecoveredActive(false); await refreshMeetings() },
-    discard: async () => { await controller.discard(); setRecoveredActive(false); await refreshMeetings() },
+    stop: async () => { await controller.stop(); setRecordingPhase('idle'); setRecoveredActive(false); await refreshMeetings() },
+    discard: async () => { await controller.discard(); setRecordingPhase('idle'); setRecoveredActive(false); await refreshMeetings() },
     pause: async () => { await controller.pause?.() },
     resume: async () => { await controller.resume?.() },
     subscribe: controller.subscribe === undefined ? undefined : controller.subscribe.bind(controller),
@@ -210,13 +215,30 @@ export function App({
   </>
 
   const activeNavigation = screen === 'templates' || screen === 'settings' ? screen : 'all'
+  const quickRecordStatus = recordingPhase === 'recording' || recordingPhase === 'paused'
+    ? 'recording'
+    : recordingPhase === 'saving'
+      ? 'saving'
+      : recordingPhase === 'failed'
+        ? 'unavailable'
+        : 'idle'
 
-  return <AppShell active={activeNavigation} onNavigate={navigate} onQuickRecord={() => { setScreen('all'); setQuickStartRequest((request) => request + 1) }}>
+  return <AppShell active={activeNavigation} onNavigate={navigate} quickRecordStatus={quickRecordStatus} onQuickRecord={() => {
+    if (quickRecordStatus === 'recording') {
+      setQuickStopRequest((request) => request + 1)
+      return
+    }
+    if (quickRecordStatus === 'idle') {
+      setScreen('all')
+      setQuickStartRequest((request) => request + 1)
+    }
+  }}>
     <div hidden={screen !== 'all'}>
       <Dashboard
         meetings={meetings}
         recordingControls={recordingControls}
         recordingStartRequest={quickStartRequest}
+        recordingStopRequest={quickStopRequest}
         templates={desktopApi.templates}
         onSearch={(input) => desktopApi.meetings.search(input)}
         onOpenMeeting={(id) => void openMeeting(id)}

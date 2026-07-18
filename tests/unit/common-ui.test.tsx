@@ -170,6 +170,21 @@ describe('common UI semantics', () => {
     expect(onQuickRecord).toHaveBeenCalledOnce()
   })
 
+  it('changes the header quick action from recording to stop', () => {
+    const onQuickRecord = vi.fn()
+    render(
+      <AppShell active="all" onNavigate={vi.fn()} onQuickRecord={onQuickRecord} quickRecordStatus="recording">
+        <main>콘텐츠</main>
+      </AppShell>,
+    )
+
+    const stop = screen.getByRole('button', { name: '녹음 종료' })
+    expect(stop).toHaveTextContent('종료')
+    expect(stop.querySelector('.ui-icon')).toBeVisible()
+    fireEvent.click(stop)
+    expect(onQuickRecord).toHaveBeenCalledOnce()
+  })
+
   it('connects page header actions and its forwarded heading ref', () => {
     const headingRef = createRef<HTMLHeadingElement>()
     const onBack = vi.fn()

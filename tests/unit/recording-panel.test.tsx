@@ -242,4 +242,19 @@ describe('RecordingPanel', () => {
       farFieldMode: true,
     })
   })
+
+  it('stops the active recording when the header quick action is requested', async () => {
+    const controls = {
+      start: vi.fn(async () => undefined),
+      stop: vi.fn(async () => undefined),
+      discard: vi.fn(async () => undefined),
+    }
+    const view = render(<RecordingPanel controls={controls} onNavigate={vi.fn()} stopRequest={0} />)
+    await userEvent.setup().click(screen.getByRole('button', { name: '녹음 시작' }))
+
+    await act(async () => view.rerender(<RecordingPanel controls={controls} onNavigate={vi.fn()} stopRequest={1} />))
+
+    expect(controls.stop).toHaveBeenCalledOnce()
+    expect(await screen.findByRole('button', { name: '녹음 시작' })).toBeVisible()
+  })
 })
