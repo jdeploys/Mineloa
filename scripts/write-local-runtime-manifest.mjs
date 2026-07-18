@@ -66,7 +66,7 @@ async function replaceOwnedManifest(root, manifestPath, contents) {
   const temporary = join(root, `.runtime-manifest-${randomUUID()}.tmp`)
   let temporaryExists = false
   try {
-    const handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+    const handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o644)
     temporaryExists = true
     try {
       await handle.writeFile(contents, 'utf8')
@@ -110,7 +110,7 @@ export async function writeRuntimeManifest({ directory, platform, arch, replaceE
   const manifestPath = join(root, 'runtime-manifest.json')
   if (replaceExisting) await replaceOwnedManifest(root, manifestPath, contents)
   else {
-    const handle = await open(manifestPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600)
+    const handle = await open(manifestPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o644)
     try {
       await handle.writeFile(contents, 'utf8')
       await handle.sync()

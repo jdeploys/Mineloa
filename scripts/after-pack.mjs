@@ -60,7 +60,9 @@ async function resolveKeychainFile(context, identity) {
 export function createAfterPackHook(dependencies = {}) {
   const run = dependencies.run ?? defaultRun
   const refreshManifest = dependencies.writeManifest ?? writeRuntimeManifest
-  const resolveIdentity = dependencies.identity ?? (() => process.env.CSC_NAME?.trim() || '-')
+  const resolveIdentity = dependencies.identity ?? (() => (
+    process.env.MAS_APP_SIGNING_IDENTITY?.trim() || process.env.CSC_NAME?.trim() || '-'
+  ))
   const signApplication = dependencies.signApplication ?? signAsync
   return async function signLocalRuntimeHelpers(context) {
     if (!['darwin', 'mas'].includes(context.electronPlatformName)) return
