@@ -80,6 +80,7 @@ if (verificationRequest !== null) {
                 platform: process.platform,
                 arch: process.arch,
                 developmentRuntimeDirectory: process.env.NNOTE_LOCAL_RUNTIME_DIR,
+                developmentProjectDirectory: app.getAppPath(),
               }),
               verifiedModelPath: (model) => whisperModels.verifiedPath(model),
               resolveModel: () => processingSettings.get().localWhisperModel,

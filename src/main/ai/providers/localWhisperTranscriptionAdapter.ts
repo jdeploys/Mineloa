@@ -64,7 +64,7 @@ function assertProcess(result: OwnedProcessResult): void {
   if (result.status === 'timeout') throw safeError('LOCAL_WHISPER_TIMEOUT', 'Local Whisper timed out. Try again.', true)
   if (result.status === 'cancelled') throw safeError('LOCAL_WHISPER_CANCELLED', 'Local Whisper was cancelled.', true)
   if (result.status === 'output_overflow') throw safeError('LOCAL_WHISPER_PROCESS_OUTPUT_TOO_LARGE', 'Local Whisper produced too much diagnostic output.')
-  if (result.status === 'spawn_error') throw safeError('LOCAL_WHISPER_RUNTIME_UNAVAILABLE', 'Local Whisper runtime is unavailable.')
+  if (result.status === 'spawn_error') throw safeError('LOCAL_WHISPER_RUNTIME_UNAVAILABLE', 'Local Whisper runtime is unavailable.', true)
   throw safeError('LOCAL_WHISPER_PROCESS_FAILED', 'Local Whisper processing failed.', true)
 }
 
@@ -112,7 +112,7 @@ export class LocalWhisperTranscriptionAdapter implements TranscriptionProvider {
       const input = await trustedInput(this.dependencies.recordingsRoot, request.filePath)
       let runtime: LocalRuntimePaths
       try { runtime = await this.dependencies.resolveRuntimePaths() } catch {
-        throw safeError('LOCAL_WHISPER_RUNTIME_UNAVAILABLE', 'Local Whisper runtime is unavailable.')
+        throw safeError('LOCAL_WHISPER_RUNTIME_UNAVAILABLE', 'Local Whisper runtime is unavailable.', true)
       }
       let model: string
       try { model = await this.dependencies.verifiedModelPath(this.dependencies.resolveModel()) } catch {

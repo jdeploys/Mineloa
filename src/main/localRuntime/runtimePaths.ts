@@ -13,10 +13,11 @@ export interface LocalRuntimePathOptions {
   platform: NodeJS.Platform
   arch: string
   developmentRuntimeDirectory?: string
+  developmentProjectDirectory?: string
 }
 
 function unavailable(code = 'LOCAL_WHISPER_RUNTIME_UNAVAILABLE') {
-  return safeProviderError(code, 'Local Whisper runtime is unavailable.', false)
+  return safeProviderError(code, 'Local Whisper runtime is unavailable.', true)
 }
 
 function isOwned(root: string, candidate: string): boolean {
@@ -42,6 +43,9 @@ export async function resolveLocalRuntimePaths(options: LocalRuntimePathOptions)
     const requestedRoot = options.isPackaged
       ? join(options.resourcesPath, 'local-runtime', target)
       : options.developmentRuntimeDirectory
+        ?? (options.developmentProjectDirectory === undefined
+          ? undefined
+          : join(options.developmentProjectDirectory, 'build', 'local-runtime', target))
     if (requestedRoot === undefined || !isAbsolute(requestedRoot)) throw unavailable()
     const rootDetails = await lstat(requestedRoot)
     if (!rootDetails.isDirectory() || rootDetails.isSymbolicLink()) throw unavailable()

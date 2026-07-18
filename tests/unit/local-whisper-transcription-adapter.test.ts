@@ -267,6 +267,7 @@ describe('LocalWhisperTranscriptionAdapter', () => {
     })
     await expect(missingRuntime.transcribe({ filePath: h.input })).rejects.toMatchObject({
       code: 'LOCAL_WHISPER_RUNTIME_UNAVAILABLE',
+      retryable: true,
     })
     const corruptModel = new LocalWhisperTranscriptionAdapter({
       resolveRuntimePaths: async () => ({ ffmpegPath: h.ffmpegPath, whisperPath: h.whisperPath }),
@@ -349,10 +350,29 @@ describe('local runtime path resolver', () => {
       .rejects.toMatchObject({ code: 'LOCAL_WHISPER_RUNTIME_UNAVAILABLE' })
   })
 
-  it('requires an explicit development override and never searches PATH', async () => {
+  it('requires an owned development root and never searches PATH', async () => {
     const resources = await root('nnote-runtime-dev-')
     await expect(resolveLocalRuntimePaths({ isPackaged: false, resourcesPath: resources, platform: 'win32', arch: 'x64' }))
       .rejects.toMatchObject({ code: 'LOCAL_WHISPER_RUNTIME_UNAVAILABLE' })
+  })
+
+  it('discovers the fixed platform runtime under the development project', async () => {
+    const project = await root('nnote-runtime-project-')
+    const owned = join(project, 'build', 'local-runtime', 'darwin-arm64')
+    await mkdir(owned, { recursive: true })
+    await writeFile(join(owned, 'ffmpeg'), 'ffmpeg')
+    await writeFile(join(owned, 'whisper-cli'), 'whisper')
+
+    await expect(resolveLocalRuntimePaths({
+      isPackaged: false,
+      resourcesPath: 'unused',
+      platform: 'darwin',
+      arch: 'arm64',
+      developmentProjectDirectory: project,
+    })).resolves.toEqual({
+      ffmpegPath: resolve(owned, 'ffmpeg'),
+      whisperPath: resolve(owned, 'whisper-cli'),
+    })
   })
 
   it('accepts an explicit owned development override and both packaged macOS targets', async () => {
