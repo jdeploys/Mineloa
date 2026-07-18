@@ -38,7 +38,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Validate release candidate
-        run: npm run test:release
+        run: npm run lint && npm run typecheck && npm run rebuild:node && npm run test:unit && npm run test:integration
       - name: Build pinned Apple Silicon local runtime
         run: bash ./scripts/build-local-runtime.sh arm64 2>&1 | tee runtime-build.log
       - name: Install App Store provisioning profile
