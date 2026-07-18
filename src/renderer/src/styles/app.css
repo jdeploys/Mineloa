@@ -265,7 +265,7 @@
 .recovery-metrics dd { margin: 6px 0 0; color: var(--ink); font: 600 15px/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; }
 .recovery-item .inline-notice p, .recovery-panel > .inline-notice p { margin: 0; }
 .processing-panel { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.processing-copy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; color: var(--ink-subtle); }
+.processing-copy { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--ink-subtle); }
 .processing-copy strong { color: var(--ink); }
 .processing-active { min-height: 44px; border: 1px solid var(--hairline); border-radius: var(--radius-control); background: var(--surface-2); color: var(--ink-muted); display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; font-weight: 650; white-space: nowrap; }
 .processing-error { margin: 10px 0 0; color: var(--danger); }
