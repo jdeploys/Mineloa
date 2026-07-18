@@ -48,11 +48,27 @@ jobs:
           set -euo pipefail
           test -n "$MAS_PROVISIONING_PROFILE_BASE64"
           printf '%s' "$MAS_PROVISIONING_PROFILE_BASE64" | base64 --decode > build/mineloa-app-store.provisionprofile
+      - name: Prepare macOS-compatible signing identities
+        env:
+          MAS_CERTIFICATE_P12_BASE64: ${{ secrets.MAS_CERTIFICATE_P12_BASE64 }}
+          MAS_INSTALLER_CERTIFICATE_P12_BASE64: ${{ secrets.MAS_INSTALLER_CERTIFICATE_P12_BASE64 }}
+          MAS_CERTIFICATE_PASSWORD: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$MAS_CERTIFICATE_P12_BASE64" | base64 --decode > build/distribution-modern.p12
+          printf '%s' "$MAS_INSTALLER_CERTIFICATE_P12_BASE64" | base64 --decode > build/installer-modern.p12
+          openssl pkcs12 -in build/distribution-modern.p12 -passin env:MAS_CERTIFICATE_PASSWORD -nodes -out build/distribution.bundle.pem
+          openssl pkcs12 -export -in build/distribution.bundle.pem -out build/distribution.p12 \
+            -passout env:MAS_CERTIFICATE_PASSWORD -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1
+          openssl pkcs12 -in build/installer-modern.p12 -passin env:MAS_CERTIFICATE_PASSWORD -nodes -out build/installer.bundle.pem
+          openssl pkcs12 -export -in build/installer.bundle.pem -out build/installer.p12 \
+            -passout env:MAS_CERTIFICATE_PASSWORD -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1
+          find build -type f \( -name '*-modern.p12' -o -name '*.bundle.pem' \) -delete
       - name: Build signed Mac App Store package
         env:
-          CSC_LINK: ${{ secrets.MAS_CERTIFICATE_P12_BASE64 }}
+          CSC_LINK: build/distribution.p12
           CSC_KEY_PASSWORD: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
-          CSC_INSTALLER_LINK: ${{ secrets.MAS_INSTALLER_CERTIFICATE_P12_BASE64 }}
+          CSC_INSTALLER_LINK: build/installer.p12
           CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
           CSC_NAME: Apple Distribution
           MAS_BUILD: 'true'
