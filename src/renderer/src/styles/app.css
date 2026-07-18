@@ -212,7 +212,7 @@
 .processing-mode-options label > span { display: grid; gap: 3px; }
 .processing-mode-options strong { color: var(--ink); font-size: 14px; }
 .processing-mode-options small { color: var(--ink-tertiary); font-size: 12px; line-height: 1.4; }
-.local-settings { display: grid; gap: 16px; padding-top: 20px; border-top: 1px solid var(--hairline); }
+.openai-settings, .local-settings { display: grid; gap: 16px; padding-top: 20px; border-top: 1px solid var(--hairline); }
 .local-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .local-settings-heading > span:first-child { display: grid; gap: 3px; }
 .local-settings-heading strong { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 17px; }

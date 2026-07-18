@@ -68,6 +68,8 @@ describe('processing provider settings visible outcomes', () => {
   it('shows OpenAI as the default and hides local settings', async () => {
     render(<ProcessingProviderSettingsView settings={settingsApi()} />)
     expect(await screen.findByRole('radio', { name: /OpenAI/ })).toBeChecked()
+    expect(screen.getByRole('region', { name: 'OpenAI 설정' })).toBeVisible()
+    expect(screen.getByLabelText('OpenAI API 키')).toBeVisible()
     expect(screen.getByRole('radio', { name: /로컬 설정/ })).not.toBeChecked()
     expect(screen.queryByRole('region', { name: '로컬 설정' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('회의록 작성 방식')).not.toBeInTheDocument()
@@ -97,6 +99,8 @@ describe('processing provider settings visible outcomes', () => {
   it('shows local-only audio privacy and missing speaker separation', async () => {
     render(<ProcessingProviderSettingsView settings={settingsApi()} />)
     await expand()
+    expect(screen.queryByRole('region', { name: 'OpenAI 설정' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('OpenAI API 키')).not.toBeInTheDocument()
     expect(await screen.findByRole('note', { name: '로컬 처리' })).toBeVisible()
     expect(screen.getByText('오디오는 외부로 전송되지 않습니다.')).toBeVisible()
     expect(screen.getByText('화자 분리를 지원하지 않습니다.')).toBeVisible()

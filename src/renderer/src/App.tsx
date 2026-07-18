@@ -16,7 +16,6 @@ import {
 import { RecoveryDialog } from './features/recording/RecoveryDialog'
 import { RecordingPanel } from './features/recording/RecordingPanel'
 import { AppearanceSettings } from './features/settings/AppearanceSettings'
-import { ApiKeySettings } from './features/settings/ApiKeySettings'
 import { MeetingRecordSettings } from './features/settings/MeetingRecordSettings'
 import { ProcessingProviderSettings } from './features/settings/ProcessingProviderSettings'
 import { TemplateEditor } from './features/templates/TemplateEditor'
@@ -248,7 +247,6 @@ export function App({
     {screen === 'settings' && <main className="page-container settings-page">
       <PageHeader ref={routeHeading} eyebrow="SETTINGS" title="설정" description="Mineloa가 기록과 AI 처리를 사용하는 방식을 관리합니다." backLabel="전체 기록" onBack={backToAll} />
       <AppearanceSettings preference={preference} onChange={setPreference} />
-      <ApiKeySettings settings={desktopApi.settings} />
       <ProcessingProviderSettings settings={desktopApi.settings} />
       <MeetingRecordSettings
         error={archiveNotice}

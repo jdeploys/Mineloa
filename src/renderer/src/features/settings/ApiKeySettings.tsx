@@ -8,9 +8,10 @@ import { Icon } from '../../components/ui/Icon'
 
 interface ApiKeySettingsProps {
   settings: SettingsApi
+  embedded?: boolean
 }
 
-export function ApiKeySettings({ settings }: ApiKeySettingsProps) {
+export function ApiKeySettings({ settings, embedded = false }: ApiKeySettingsProps) {
   const [value, setValue] = useState('')
   const [status, setStatus] = useState<ApiKeyStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -85,36 +86,40 @@ export function ApiKeySettings({ settings }: ApiKeySettingsProps) {
     }
   }
 
+  const credentialCard = <SurfaceCard labelledBy="api-key-credential-title" className="credential-card">
+    <div className="credential-card-heading">
+      <h3 id="api-key-credential-title">OpenAI API 자격 증명</h3>
+      <StatusIndicator available={status?.configured === true}>
+        {status === null ? '상태 확인 불가' : status.configured ? '설정됨' : '설정되지 않음'}
+      </StatusIndicator>
+    </div>
+    {status?.lastValidatedAt ? <p className="settings-meta">마지막 검증: {status.lastValidatedAt}</p> : null}
+    <form className="credential-form" onSubmit={save}>
+      <label htmlFor="openai-api-key">OpenAI API 키</label>
+      <input
+        id="openai-api-key"
+        type="password"
+        autoComplete="off"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      <ActionBar danger={status?.configured ? <Button icon="delete" variant="danger" type="button" disabled={busy} onClick={() => void remove()}>API 키 삭제</Button> : undefined}>
+        <Button icon="key" variant="primary" type="submit" disabled={busy || value.length === 0}>
+          API 키 저장
+        </Button>
+      </ActionBar>
+    </form>
+    {error ? <p role="alert" className="settings-alert">{error}</p> : null}
+  </SurfaceCard>
+
+  if (embedded) return credentialCard
+
   return (
     <section className="settings-panel" aria-labelledby="api-key-settings-title">
       <div className="settings-heading">
         <div><p className="eyebrow">OPENAI</p><h2 id="api-key-settings-title"><Icon name="key" />API 키 설정</h2></div>
       </div>
-      <SurfaceCard labelledBy="api-key-credential-title" className="credential-card">
-        <div className="credential-card-heading">
-          <h3 id="api-key-credential-title">OpenAI API 자격 증명</h3>
-          <StatusIndicator available={status?.configured === true}>
-            {status === null ? '상태 확인 불가' : status.configured ? '설정됨' : '설정되지 않음'}
-          </StatusIndicator>
-        </div>
-        {status?.lastValidatedAt ? <p className="settings-meta">마지막 검증: {status.lastValidatedAt}</p> : null}
-        <form className="credential-form" onSubmit={save}>
-          <label htmlFor="openai-api-key">OpenAI API 키</label>
-          <input
-            id="openai-api-key"
-            type="password"
-            autoComplete="off"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-          />
-          <ActionBar danger={status?.configured ? <Button icon="delete" variant="danger" type="button" disabled={busy} onClick={() => void remove()}>API 키 삭제</Button> : undefined}>
-            <Button icon="key" variant="primary" type="submit" disabled={busy || value.length === 0}>
-              API 키 저장
-            </Button>
-          </ActionBar>
-        </form>
-        {error ? <p role="alert" className="settings-alert">{error}</p> : null}
-      </SurfaceCard>
+      {credentialCard}
     </section>
   )
 }

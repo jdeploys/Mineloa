@@ -8,6 +8,7 @@ import { PrivacyNotice } from '../../components/help/PrivacyNotice'
 import { FieldHelp } from '../../components/help/FieldHelp'
 import { Icon } from '../../components/ui/Icon'
 import { CodexCliStatus } from './CodexCliStatus'
+import { ApiKeySettings } from './ApiKeySettings'
 import { WhisperModelSettings } from './WhisperModelSettings'
 
 const loadError = '처리 설정을 불러오지 못했습니다. 잠시 후 다시 시도하세요.'
@@ -116,6 +117,12 @@ export function ProcessingProviderSettings({ settings }: { settings: SettingsApi
         <span><strong>로컬 설정</strong><small>이 Mac의 Whisper 모델로 음성을 변환합니다.</small></span>
       </label>
     </div>
+    {mode === 'openai' && <div className="openai-settings" role="region" aria-label="OpenAI 설정">
+      <div className="local-settings-heading">
+        <span><span className="eyebrow">OPENAI</span><strong><Icon name="key" />OpenAI 설정</strong></span>
+      </div>
+      <ApiKeySettings settings={settings} embedded />
+    </div>}
     {mode === 'local' && <div className="local-settings" role="region" aria-label="로컬 설정">
       <div className="local-settings-heading">
         <span><span className="eyebrow">LOCAL</span><strong><Icon name="model" />로컬 설정</strong></span>
