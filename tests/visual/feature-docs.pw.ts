@@ -24,6 +24,8 @@ const screenshotNames = [
   '13-codex-cli-unavailable.png',
   '14-theme-light.png',
   '15-theme-dark.png',
+  '16-meeting-record-import.png',
+  '17-template-header.png',
 ] as const
 
 type ScreenshotName = typeof screenshotNames[number]
@@ -110,16 +112,17 @@ async function alignBelowStickyHeader(page: Page, selector: string) {
 }
 
 async function avoidStickyHeaderTextClipping(page: Page) {
-  const adjustment = await page.evaluate(() => {
-    const headerBottom = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0
-    const overlapping = [...document.querySelectorAll<HTMLElement>('main h1, main h2, main h3, main strong, main label, main p')]
-      .find((element) => {
-        const rect = element.getBoundingClientRect()
-        return rect.top < headerBottom && rect.bottom > headerBottom
-      })
-    return overlapping === undefined ? 0 : headerBottom + 24 - overlapping.getBoundingClientRect().top
-  })
-  if (adjustment > 0) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const adjustment = await page.evaluate(() => {
+      const headerBottom = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0
+      const overlapping = [...document.querySelectorAll<HTMLElement>('main h1, main h2, main h3, main strong, main label, main p')]
+        .find((element) => {
+          const rect = element.getBoundingClientRect()
+          return rect.top < headerBottom && rect.bottom > headerBottom
+        })
+      return overlapping === undefined ? 0 : headerBottom + 24 - overlapping.getBoundingClientRect().top
+    })
+    if (adjustment <= 0) return
     await page.evaluate((offset) => scrollBy({ top: -offset, left: 0, behavior: 'auto' }), adjustment)
     await settle(page)
   }
@@ -232,6 +235,7 @@ test('documents summary template editing through the real template route', async
   await expect(page.getByRole('heading', { name: '템플릿 편집', exact: true })).toBeInViewport()
   await expect(page.getByRole('button', { name: '템플릿 저장' })).toBeInViewport()
   await expectFullyInViewport(page, '.template-editor')
+  await avoidStickyHeaderTextClipping(page)
   await expectNoStickyHeaderTextClipping(page)
   await page.screenshot({ path: output('06-template-editor.png'), animations: 'disabled', fullPage: false, omitBackground: false })
 })
@@ -286,4 +290,21 @@ test('documents corrected light theme controls through the real settings route',
 
 test('documents corrected dark theme controls through the real settings route', async ({ page }) => {
   await captureTheme(page, 'dark', '15-theme-dark.png')
+})
+
+test('documents meeting record import through the real settings route', async ({ page }) => {
+  await openRoute(page, 'settings')
+  await waitForStableSettings(page, 'OpenAI API · OpenAI API', false)
+  const recordSettings = page.getByRole('region', { name: '회의 기록 관리' })
+  await expect(recordSettings.getByRole('button', { name: '회의 기록 가져오기' })).toBeVisible()
+  await recordSettings.screenshot({ path: output('16-meeting-record-import.png'), animations: 'disabled', omitBackground: false })
+})
+
+test('documents the aligned template page header', async ({ page }) => {
+  await openRoute(page, 'templates')
+  const back = page.locator('.page-header .back-button')
+  const heading = page.getByRole('heading', { name: '요약 템플릿', exact: true })
+  await expect(back).toBeInViewport()
+  await expect(heading).toBeInViewport()
+  await page.screenshot({ path: output('17-template-header.png'), animations: 'disabled', fullPage: false, omitBackground: false })
 })

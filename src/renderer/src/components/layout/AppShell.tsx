@@ -7,12 +7,10 @@ type PrimaryScreen = 'all' | 'templates' | 'settings'
 export function AppShell({
   active,
   onNavigate,
-  onImport,
   children,
 }: {
   active: PrimaryScreen
   onNavigate(destination: PrimaryScreen): void
-  onImport?(): void
   children: ReactNode
 }) {
   const entries: ReadonlyArray<readonly [PrimaryScreen, string, IconName]> = [
@@ -46,12 +44,6 @@ export function AppShell({
               {label}
             </button>
           ))}
-          {onImport === undefined ? null : (
-            <button type="button" className="nav-import" onClick={onImport}>
-              <Icon name="import" />
-              .nnote 가져오기
-            </button>
-          )}
         </nav>
       </header>
       {children}

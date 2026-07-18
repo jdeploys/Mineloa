@@ -188,12 +188,27 @@ test('real template route resets scroll and keeps its heading and save action in
   await expect(page).toHaveScreenshot('templates-light.png', { animations: 'disabled', fullPage: false, omitBackground: false })
 })
 
+test('template page keeps the back action above and aligned with the title', async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 })
+  await openRoute(page, 'templates')
+  const back = page.locator('.page-header .back-button')
+  const heading = page.getByRole('heading', { name: '요약 템플릿', exact: true })
+  const [backBox, headingBox] = await Promise.all([back.boundingBox(), heading.boundingBox()])
+
+  expect(backBox).not.toBeNull()
+  expect(headingBox).not.toBeNull()
+  expect(Math.abs(backBox!.x - headingBox!.x)).toBeLessThanOrEqual(1)
+  expect(backBox!.y + backBox!.height).toBeLessThanOrEqual(headingBox!.y)
+})
+
 test('real primary actions render aligned semantic icons without horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 800 })
   await openRoute(page, 'idle')
-  for (const label of ['전체 기록', '요약 템플릿', '설정', '.nnote 가져오기', '녹음 시작']) {
+  for (const label of ['전체 기록', '요약 템플릿', '설정', '녹음 시작']) {
     await expectPaintableActionIcon(page, label)
   }
+  await page.getByRole('button', { name: '설정', exact: true }).click()
+  await expectPaintableActionIcon(page, '회의 기록 가져오기')
   await expectNoHorizontalOverflow(page)
 })
 

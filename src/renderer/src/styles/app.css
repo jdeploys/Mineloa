@@ -6,8 +6,6 @@
 .app-nav button { min-height: 48px; border-color: transparent; background: transparent; color: var(--ink-subtle); display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; }
 .app-nav button:hover:not(:disabled), .app-nav button[aria-current='page'] { background: var(--surface-2); color: var(--ink); }
 .app-nav button[aria-current='page'] { border-color: var(--hairline); }
-.nav-import { margin-left: 8px; }
-
 .surface-card { min-width: 0; border: 1px solid var(--hairline); border-radius: var(--radius-card); background: var(--surface-1); padding: 24px; }
 .status-badge { display: inline-flex; align-items: center; gap: 5px; width: fit-content; border: 1px solid var(--hairline); border-radius: var(--radius-full); background: var(--surface-2); color: var(--ink-subtle); padding: 4px 8px; font-size: var(--type-size-badge); font-weight: 600; line-height: 1.2; }
 .status-badge[data-tone='success'] { color: var(--status-badge-success-foreground); }
@@ -132,6 +130,10 @@
 .theme-options { display: grid; gap: 12px; }
 .appearance-settings .theme-options > label { display: flex; align-items: center; gap: 8px; }
 .appearance-settings .theme-options input[type='radio'] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; margin: 0; padding: 0; }
+.meeting-record-settings { display: grid; gap: 18px; }
+.meeting-record-import { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 18px; border-top: 1px solid var(--hairline); }
+.meeting-record-import p { margin: 4px 0 0; color: var(--ink-subtle); font-size: var(--type-size-caption-sm); }
+.meeting-record-settings > .inline-notice p { margin: 0 0 12px; }
 .processing-settings { display: grid; gap: 16px; }
 .advanced-settings > summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 48px; color: var(--ink); cursor: pointer; list-style: none; }
 .advanced-settings > summary::-webkit-details-marker { display: none; }
@@ -190,8 +192,12 @@
 .template-editor > .action-bar > div:first-child { width: 100%; justify-content: flex-end; }
 .template-danger-zone { margin-top: 0; }
 @media (min-width: 744px) {
-  .template-page .page-header { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 20px; margin-bottom: 12px; }
+  .template-page { padding-top: 8px; }
+  .template-page .page-header { gap: 0; margin-bottom: 0; }
   .template-page .page-header-row { min-width: 0; }
+  .template-page .back-button { min-height: 36px; }
+  .template-page .eyebrow { margin-bottom: 4px; }
+  .template-page .page-header-row > div > p:last-child { margin-top: 4px; }
   .template-editor { gap: 12px; padding: 16px; }
   .template-sections-heading > div { padding-top: 10px; }
   .template-sections-heading > span { margin-top: 8px; }
@@ -256,6 +262,8 @@
   .credential-form { grid-template-columns: 1fr; }
   .credential-form > .action-bar > div, .credential-form .ui-button { width: 100%; }
   .danger-zone { align-items: stretch; flex-direction: column; }
+  .meeting-record-import { align-items: stretch; flex-direction: column; }
+  .meeting-record-import .ui-button { width: 100%; }
   .advanced-settings > summary { align-items: flex-start; gap: 10px; }
   .advanced-summary { display: none; }
   .provider-grid { grid-template-columns: 1fr; }

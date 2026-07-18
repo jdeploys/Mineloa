@@ -142,9 +142,8 @@ describe('common UI semantics', () => {
 
   it('renders app navigation and reports native navigation actions', () => {
     const onNavigate = vi.fn()
-    const onImport = vi.fn()
     render(
-      <AppShell active="templates" onNavigate={onNavigate} onImport={onImport}>
+      <AppShell active="templates" onNavigate={onNavigate}>
         <main>콘텐츠</main>
       </AppShell>,
     )
@@ -154,16 +153,15 @@ describe('common UI semantics', () => {
       'aria-current',
       'page',
     )
-    for (const name of ['전체 기록', '요약 템플릿', '설정', '.nnote 가져오기']) {
+    for (const name of ['전체 기록', '요약 템플릿', '설정']) {
       expect(within(navigation).getByRole('button', { name }).querySelector('.ui-icon')).toBeVisible()
     }
+    expect(within(navigation).queryByRole('button', { name: /가져오기/ })).not.toBeInTheDocument()
     const brand = screen.getByRole('button', { name: 'Mineloa 홈' })
     expect(brand).toHaveTextContent('Mineloa')
     expect(brand.querySelector('.brand-mark')).toHaveAttribute('aria-hidden', 'true')
     fireEvent.click(brand)
-    fireEvent.click(within(navigation).getByRole('button', { name: '.nnote 가져오기' }))
     expect(onNavigate).toHaveBeenCalledWith('all')
-    expect(onImport).toHaveBeenCalledOnce()
   })
 
   it('connects page header actions and its forwarded heading ref', () => {

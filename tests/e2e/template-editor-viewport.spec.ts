@@ -18,7 +18,7 @@ test('shows the primary template save action in the initial 1200x800 viewport', 
     const page = await app.firstWindow()
     await expect(page).toHaveTitle('Mineloa')
     await page.getByRole('button', { name: '요약 템플릿' }).click()
-    await page.locator('button[data-variant="tertiary"]').filter({ hasText: '새 템플릿' }).click()
+    await page.getByRole('button', { name: '새 템플릿' }).click()
     await expect(page.getByLabel('템플릿 이름')).toHaveValue('새 템플릿')
     await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }))
 

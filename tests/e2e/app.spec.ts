@@ -20,7 +20,7 @@ test('launches the real built app securely and records fake microphone audio', a
     await expect(window).toHaveTitle('Mineloa')
     expect(await window.evaluate(() => typeof (window as unknown as { require?: unknown }).require)).toBe('undefined')
     await expect(window.getByRole('heading', { name: '새 회의' })).toBeVisible()
-    await expect(window.getByRole('button', { name: '.nnote 가져오기' })).toBeVisible()
+    await expect(window.getByRole('navigation', { name: '주요 메뉴' }).getByRole('button', { name: /가져오기/ })).toHaveCount(0)
     await expect(window.getByLabel('요약 템플릿')).toBeVisible()
     await expect(window.getByLabel('원본 오디오')).toBeVisible()
 
@@ -30,6 +30,7 @@ test('launches the real built app securely and records fake microphone audio', a
 
     await window.getByRole('button', { name: '설정', exact: true }).click()
     await expect(window.getByRole('heading', { name: '설정', exact: true })).toBeInViewport()
+    await expect(window.getByRole('button', { name: '회의 기록 가져오기' })).toBeVisible()
     expect(await window.evaluate(() => ({
       scrollY,
       theme: document.documentElement.dataset.theme,

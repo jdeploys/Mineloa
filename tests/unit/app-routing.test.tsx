@@ -149,7 +149,9 @@ describe('App route and recording ownership', () => {
     expect(screen.getByRole('button', { name: '설정' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: '설정' })).toHaveAttribute('data-focus-key', 'nav-settings')
     expect(screen.getByRole('button', { name: '요약 템플릿' })).toHaveAttribute('data-focus-key', 'nav-templates')
-    expect(screen.getByRole('button', { name: '.nnote 가져오기' })).toHaveClass('nav-import')
+    expect(within(navigation).queryByRole('button', { name: /가져오기/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '회의 기록 관리' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '회의 기록 가져오기' })).toBeVisible()
   })
 
   it('moves the templates route to the visible page top and focuses its heading without scrolling it', async () => {
@@ -240,18 +242,19 @@ describe('App route and recording ownership', () => {
     expect(focus.mock.contexts.filter((context) => context === heading)).toHaveLength(entryFocusCount)
   })
 
-  it('imports a .nnote from the dashboard and opens the imported meeting', async () => {
+  it('imports a meeting record from settings and opens the imported meeting', async () => {
     const user = userEvent.setup()
     const imported = { ...meeting, id: 'imported-1', title: '가져온 회의' }
     const desktopApi = api({ get: vi.fn(async () => ({ ...documentFixture, meeting: imported })) })
     vi.mocked(desktopApi.archive.importMeeting).mockResolvedValue({ status: 'success', meetingId: imported.id, includedAudio: true, audioCoverage: 'all-parts' })
     render(<App desktopApi={desktopApi} recordingController={{ start: vi.fn(), stop: vi.fn(), discard: vi.fn() }} />)
-    await user.click(await screen.findByRole('button', { name: '.nnote 가져오기' }))
+    await user.click(await screen.findByRole('button', { name: '설정' }))
+    await user.click(screen.getByRole('button', { name: '회의 기록 가져오기' }))
     expect(await screen.findByRole('heading', { name: '가져온 회의' })).toBeVisible()
     expect(desktopApi.meetings.get).toHaveBeenCalledWith('imported-1')
   })
 
-  it('keeps the dashboard functional and offers retry or dismissal after an invalid archive import', async () => {
+  it('keeps meeting record settings usable and offers retry or dismissal after an invalid import', async () => {
     const user = userEvent.setup()
     const desktopApi = api()
     vi.mocked(desktopApi.archive.importMeeting)
@@ -259,21 +262,21 @@ describe('App route and recording ownership', () => {
       .mockResolvedValueOnce({ status: 'cancelled' })
     render(<App desktopApi={desktopApi} recordingController={{ start: vi.fn(), stop: vi.fn(), discard: vi.fn() }} />)
 
-    await user.click(await screen.findByRole('button', { name: '.nnote 가져오기' }))
+    await user.click(await screen.findByRole('button', { name: '설정' }))
+    await user.click(screen.getByRole('button', { name: '회의 기록 가져오기' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('올바른 Mineloa 파일이 아닙니다.')
-    expect(screen.getByRole('button', { name: '녹음 시작' })).toBeVisible()
-    expect(screen.getByRole('button', { name: /제품 회의/ })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '회의 기록 관리' })).toBeVisible()
     await user.click(screen.getByRole('button', { name: '가져오기 다시 시도' }))
     expect(desktopApi.archive.importMeeting).toHaveBeenCalledTimes(2)
     expect(screen.queryByText('올바른 Mineloa 파일이 아닙니다.')).not.toBeInTheDocument()
 
     vi.mocked(desktopApi.archive.importMeeting).mockResolvedValueOnce({ status: 'failure', code: 'INVALID_ARCHIVE', message: '다시 실패했습니다.' })
-    await user.click(screen.getByRole('button', { name: '.nnote 가져오기' }))
+    await user.click(screen.getByRole('button', { name: '회의 기록 가져오기' }))
     expect(await screen.findByText('다시 실패했습니다.')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '알림 닫기' }))
     expect(screen.queryByText('다시 실패했습니다.')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '녹음 시작' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '회의 기록 가져오기' })).toBeVisible()
   })
 
   it('keeps a recovery startup failure as a fatal screen', async () => {
