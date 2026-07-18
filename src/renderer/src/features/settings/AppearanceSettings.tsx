@@ -7,7 +7,7 @@ interface AppearanceSettingsProps {
 }
 
 const themeOptions = [
-  ['system', '시스템 설정'],
+  ['system', '자동'],
   ['light', '라이트'],
   ['dark', '다크'],
 ] as const
@@ -25,24 +25,31 @@ export function AppearanceSettings({
         <p className="eyebrow">APPEARANCE</p>
         <h2 id="appearance-title"><Icon name="appearance" />화면 테마</h2>
       </div>
-      <fieldset className="theme-options">
-        <legend>테마 선택</legend>
-        {themeOptions.map(([value, label]) => (
-          <label key={value}>
-            <input
-              type="radio"
-              name="theme"
-              value={value}
-              checked={preference === value}
-              onChange={() => onChange(value)}
-            />
-            {label}
-          </label>
-        ))}
-      </fieldset>
-      <p className="field-help">
-        시스템 설정은 Windows 또는 macOS의 화면 모드를 자동으로 따릅니다.
-      </p>
+      <div className="theme-picker">
+        <div className="theme-picker-copy">
+          <strong>화면 모드</strong>
+          <p>자동 모드는 기기의 화면 설정을 따릅니다.</p>
+        </div>
+        <fieldset className="theme-options">
+          <legend className="visually-hidden">화면 모드 선택</legend>
+          {themeOptions.map(([value, label]) => (
+            <label key={value} className="theme-option">
+              <input
+                type="radio"
+                name="theme"
+                value={value}
+                checked={preference === value}
+                onChange={() => onChange(value)}
+              />
+              <span className="theme-preview" data-preview={value} aria-hidden="true">
+                <span className="theme-preview-sidebar" />
+                <span className="theme-preview-content"><i /><i /><i /></span>
+              </span>
+              <span className="theme-option-label">{label}</span>
+            </label>
+          ))}
+        </fieldset>
+      </div>
     </section>
   )
 }

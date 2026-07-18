@@ -41,7 +41,8 @@ describe('theme preference', () => {
     render(<AppearanceSettings preference="system" onChange={onChange} />)
     expect(screen.getByRole('heading', { name: '화면 테마' }).parentElement?.querySelector('.ui-icon')).toBeVisible()
 
-    expect(screen.getByRole('radio', { name: '시스템 설정' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: '자동' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: '자동' }).nextElementSibling).toHaveAttribute('data-preview', 'system')
     fireEvent.click(screen.getByRole('radio', { name: '다크' }))
 
     expect(onChange).toHaveBeenCalledWith('dark')
